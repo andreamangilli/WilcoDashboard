@@ -3,15 +3,21 @@ import { sleep } from "./utils";
 
 const AMAZON_SP_API_BASE = "https://sellingpartnerapi-eu.amazon.com";
 
-async function getAmazonAccessToken(): Promise<string> {
+export interface AmazonCredentials {
+  client_id: string;
+  client_secret: string;
+  refresh_token: string;
+}
+
+async function getAmazonAccessToken(credentials: AmazonCredentials): Promise<string> {
   const res = await fetch("https://api.amazon.com/auth/o2/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      refresh_token: process.env.AMAZON_REFRESH_TOKEN!,
-      client_id: process.env.AMAZON_CLIENT_ID!,
-      client_secret: process.env.AMAZON_CLIENT_SECRET!,
+      refresh_token: credentials.refresh_token,
+      client_id: credentials.client_id,
+      client_secret: credentials.client_secret,
     }),
   });
 
@@ -44,10 +50,13 @@ async function amazonFetch(accessToken: string, path: string, params: Record<str
   return res.json();
 }
 
-export async function syncAmazonOrders(accountId: string) {
+export async function syncAmazonOrders(
+  accountId: string,
+  marketplaceId: string,
+  credentials: AmazonCredentials
+) {
   const supabase = await createServiceClient();
-  const accessToken = await getAmazonAccessToken();
-  const marketplaceId = process.env.AMAZON_MARKETPLACE_ID!;
+  const accessToken = await getAmazonAccessToken(credentials);
 
   const createdAfter = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -92,17 +101,21 @@ export async function syncAmazonOrders(accountId: string) {
   return synced;
 }
 
-export async function syncAmazonInventory(accountId: string) {
+export async function syncAmazonInventory(
+  accountId: string,
+  marketplaceId: string,
+  credentials: AmazonCredentials
+) {
   const supabase = await createServiceClient();
-  const accessToken = await getAmazonAccessToken();
+  const accessToken = await getAmazonAccessToken(credentials);
 
   const data = await amazonFetch(
     accessToken,
     "/fba/inventory/v1/summaries",
     {
       granularityType: "Marketplace",
-      granularityId: process.env.AMAZON_MARKETPLACE_ID!,
-      marketplaceIds: process.env.AMAZON_MARKETPLACE_ID!,
+      granularityId: marketplaceId,
+      marketplaceIds: marketplaceId,
     }
   );
 

@@ -1,0 +1,27 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+export const maxDuration = 300;
+
+export async function POST() {
+  // Verify the user is authenticated
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Internally call the cron sync endpoint
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000";
+
+  const res = await fetch(`${baseUrl}/api/cron/sync`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+  });
+
+  const data = await res.json();
+  return NextResponse.json(data);
+}

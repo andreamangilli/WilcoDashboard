@@ -1,14 +1,22 @@
 import { createServiceClient } from "@/lib/supabase/server";
 
-async function getGoogleAccessToken(): Promise<string> {
+export interface GoogleAdsCredentials {
+  developer_token: string;
+  client_id: string;
+  client_secret: string;
+  refresh_token: string;
+  manager_id?: string;
+}
+
+async function getGoogleAccessToken(credentials: GoogleAdsCredentials): Promise<string> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN!,
-      client_id: process.env.GOOGLE_ADS_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET!,
+      refresh_token: credentials.refresh_token,
+      client_id: credentials.client_id,
+      client_secret: credentials.client_secret,
     }),
   });
   const data = await res.json();
@@ -16,10 +24,13 @@ async function getGoogleAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-export async function syncGoogleAds(adAccountId: string, googleAccountId: string) {
+export async function syncGoogleAds(
+  adAccountId: string,
+  googleAccountId: string,
+  credentials: GoogleAdsCredentials
+) {
   const supabase = await createServiceClient();
-  const accessToken = await getGoogleAccessToken();
-  const managerId = process.env.GOOGLE_ADS_MANAGER_ID;
+  const accessToken = await getGoogleAccessToken(credentials);
 
   const query = `
     SELECT
@@ -44,8 +55,8 @@ export async function syncGoogleAds(adAccountId: string, googleAccountId: string
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
-        ...(managerId ? { "login-customer-id": managerId } : {}),
+        "developer-token": credentials.developer_token,
+        ...(credentials.manager_id ? { "login-customer-id": credentials.manager_id } : {}),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ query }),

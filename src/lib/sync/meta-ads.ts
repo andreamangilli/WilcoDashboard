@@ -2,9 +2,17 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 const META_API_VERSION = "v21.0";
 
-export async function syncMetaAds(adAccountId: string, metaAccountId: string) {
+export interface MetaAdsCredentials {
+  access_token: string;
+}
+
+export async function syncMetaAds(
+  adAccountId: string,
+  metaAccountId: string,
+  credentials: MetaAdsCredentials
+) {
   const supabase = await createServiceClient();
-  const accessToken = process.env.META_ACCESS_TOKEN!;
+  const accessToken = credentials.access_token;
 
   const campaignsRes = await fetch(
     `https://graph.facebook.com/${META_API_VERSION}/act_${metaAccountId}/campaigns?` +

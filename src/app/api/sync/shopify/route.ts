@@ -3,10 +3,10 @@ import {
   syncShopifyOrders,
   syncShopifyProducts,
   syncShopifyCustomers,
-  getShopifyStoreConfigs,
 } from "@/lib/sync/shopify";
 import { logSyncStart, logSyncSuccess, logSyncError } from "@/lib/sync/utils";
 import { createServiceClient } from "@/lib/supabase/server";
+import { decrypt } from "@/lib/crypto";
 
 export const maxDuration = 300;
 
@@ -19,16 +19,28 @@ export async function POST(request: NextRequest) {
   const supabase = await createServiceClient();
   const { data: stores } = await supabase
     .from("stores")
-    .select("id, slug, shopify_domain");
+    .select("id, slug, shopify_domain, credentials");
 
-  const configs = getShopifyStoreConfigs();
   const results: Record<string, unknown> = {};
 
   for (const store of stores || []) {
-    const config = configs.find((c) => c.domain === store.shopify_domain);
-    if (!config) continue;
+    if (!store.credentials || !store.shopify_domain) {
+      results[store.slug] = { error: "No credentials configured" };
+      continue;
+    }
 
-    config.storeId = store.id;
+    const creds = decrypt(store.credentials) as { access_token: string };
+    if (!creds.access_token) {
+      results[store.slug] = { error: "Missing access_token in credentials" };
+      continue;
+    }
+
+    const config = {
+      storeId: store.id,
+      domain: store.shopify_domain,
+      accessToken: creds.access_token,
+    };
+
     const logId = await logSyncStart(`shopify_${store.slug}`);
 
     try {

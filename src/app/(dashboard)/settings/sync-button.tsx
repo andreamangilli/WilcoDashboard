@@ -11,13 +11,10 @@ export function SyncButton() {
   async function handleSync() {
     setLoading(true);
     try {
-      await fetch("/api/cron/sync", {
-        method: "GET",
-        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET || ""}` },
-      });
+      await fetch("/api/sync/trigger", { method: "POST" });
       router.refresh();
     } catch {
-      // Error handling — sync results visible in log table after refresh
+      // Sync results visible in log table after refresh
     } finally {
       setLoading(false);
     }

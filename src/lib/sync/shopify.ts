@@ -187,22 +187,3 @@ export async function syncShopifyCustomers(config: ShopifyStoreConfig) {
   return synced;
 }
 
-export function getShopifyStoreConfigs(): ShopifyStoreConfig[] {
-  return [
-    {
-      storeId: "",
-      domain: process.env.SHOPIFY_VITAMINITY_DOMAIN!,
-      accessToken: process.env.SHOPIFY_VITAMINITY_ACCESS_TOKEN!,
-    },
-    {
-      storeId: "",
-      domain: process.env.SHOPIFY_KMAX_DOMAIN!,
-      accessToken: process.env.SHOPIFY_KMAX_ACCESS_TOKEN!,
-    },
-    {
-      storeId: "",
-      domain: process.env.SHOPIFY_HAIRSHOP_DOMAIN!,
-      accessToken: process.env.SHOPIFY_HAIRSHOP_ACCESS_TOKEN!,
-    },
-  ];
-}
