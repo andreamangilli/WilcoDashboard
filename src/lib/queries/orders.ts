@@ -79,7 +79,8 @@ export async function getUnifiedOrders(
           .gte("created_at", start)
           .lte("created_at", end);
         if (status !== "all") query = query.eq("financial_status", status);
-        const { data: orders } = await query;
+        const { data: orders, error: ordersError } = await query;
+        if (ordersError) throw new Error(`Failed to load orders for store ${store.id}: ${ordersError.message}`);
         return (orders || []).map((o) => {
           const rawItems = (o.line_items as Array<{
             title?: string; sku?: string; quantity?: number; price?: string | number;
@@ -122,7 +123,8 @@ export async function getUnifiedOrders(
           .gte("purchase_date", start)
           .lte("purchase_date", end);
         if (status !== "all") query = query.eq("order_status", status);
-        const { data: orders } = await query;
+        const { data: orders, error: ordersError } = await query;
+        if (ordersError) throw new Error(`Failed to load orders for account ${account.id}: ${ordersError.message}`);
         return (orders || []).map((o) => ({
           id: o.id,
           source: "amazon" as const,
