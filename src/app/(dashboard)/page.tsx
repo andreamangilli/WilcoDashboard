@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { KpiCard } from "@/components/kpi-card";
 import { PageHeader } from "@/components/page-header";
 import { DateRangePicker } from "@/components/date-range-picker";
