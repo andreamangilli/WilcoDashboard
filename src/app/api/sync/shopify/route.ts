@@ -4,7 +4,6 @@ import {
   syncShopifyProducts,
   syncShopifyCustomers,
 } from "@/lib/sync/shopify";
-import { logSyncStart, logSyncSuccess, logSyncError } from "@/lib/sync/utils";
 import { createServiceClient } from "@/lib/supabase/server";
 import { decrypt } from "@/lib/crypto";
 
@@ -37,23 +36,18 @@ export async function POST(request: NextRequest) {
 
     const config = {
       storeId: store.id,
+      slug: store.slug,
       domain: store.shopify_domain,
       accessToken: creds.access_token,
     };
 
-    const logId = await logSyncStart(`shopify_${store.slug}`);
-
     try {
-      const orders = await syncShopifyOrders(config);
+      const { synced: orders, customerIds } = await syncShopifyOrders(config);
       const products = await syncShopifyProducts(config);
-      const customers = await syncShopifyCustomers(config);
-      const total = orders + products + customers;
-
-      await logSyncSuccess(logId, total);
+      const customers = await syncShopifyCustomers(config, customerIds);
       results[store.slug] = { orders, products, customers };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
-      await logSyncError(logId, message);
       results[store.slug] = { error: message };
     }
   }
