@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from 'next/cache';
+import { createServiceClient } from "@/lib/supabase/server";
 import { getDateRange } from "./utils";
 
 export type ShopifyProductPerf = {
@@ -113,87 +114,67 @@ export function aggregateAmazonProducts(
   return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
 }
 
-export async function getShopifyProductPerf(period: string, from?: string, to?: string) {
-  const supabase = await createClient();
-  const { start, end } = getDateRange(period, from, to);
+export const getShopifyProductPerf = unstable_cache(
+  async (period: string, from?: string, to?: string) => {
+    const supabase = await createServiceClient();
+    const { start, end } = getDateRange(period, from, to);
 
-  const { data: stores, error: storesError } = await supabase.from("stores").select("id, name");
-  if (storesError) throw new Error(`Failed to load stores: ${storesError.message}`);
+    const { data: stores, error: storesError } = await supabase.from('stores').select('id, name');
+    if (storesError) throw new Error(`Failed to load stores: ${storesError.message}`);
 
-  const perStoreResults = await Promise.all(
-    (stores || []).map(async (store) => {
-      const { data: orders, error: ordersError } = await supabase
-        .from("shopify_orders")
-        .select("line_items, total")
-        .eq("store_id", store.id)
-        .eq("financial_status", "paid")
-        .gte("created_at", start)
-        .lte("created_at", end);
+    const perStoreResults = await Promise.all(
+      (stores || []).map(async (store) => {
+        const [{ data: orders, error: ordersError }, { data: products }] = await Promise.all([
+          supabase.from('shopify_orders').select('line_items, total').eq('store_id', store.id).eq('financial_status', 'paid').gte('created_at', start).lte('created_at', end),
+          supabase.from('shopify_products').select('title, sku, inventory_qty').eq('store_id', store.id),
+        ]);
 
-      if (ordersError) throw new Error(`Failed to load orders for store ${store.id}: ${ordersError.message}`);
+        if (ordersError) throw new Error(`Failed to load orders for store ${store.id}: ${ordersError.message}`);
 
-      const aggregated = aggregateLineItems(orders || [], store.name);
+        const aggregated = aggregateLineItems(orders || [], store.name);
 
-      // Enrich with current inventory — keyed by sku (more precise) with title as fallback
-      const { data: products } = await supabase
-        .from("shopify_products")
-        .select("title, sku, inventory_qty")
-        .eq("store_id", store.id);
+        const inventoryByTitle = new Map((products || []).map((p) => [p.title, p.inventory_qty]));
+        const inventoryBySku = new Map((products || []).filter((p) => p.sku).map((p) => [p.sku, p.inventory_qty]));
 
-      const inventoryByTitle = new Map(
-        (products || []).map((p) => [p.title, p.inventory_qty])
-      );
-      const inventoryBySku = new Map(
-        (products || []).filter((p) => p.sku).map((p) => [p.sku, p.inventory_qty])
-      );
+        return aggregated.map((row) => ({
+          ...row,
+          inventoryQty: (row.sku ? inventoryBySku.get(row.sku) : undefined) ?? inventoryByTitle.get(row.title) ?? null,
+        }));
+      })
+    );
 
-      return aggregated.map((row) => ({
-        ...row,
-        inventoryQty:
-          (row.sku ? inventoryBySku.get(row.sku) : undefined) ??
-          inventoryByTitle.get(row.title) ??
-          null,
-      }));
-    })
-  );
+    return perStoreResults.flat().sort((a, b) => b.revenue - a.revenue);
+  },
+  ['shopify-product-perf'],
+  { revalidate: 1800, tags: ['dashboard-data'] }
+);
 
-  return perStoreResults.flat().sort((a, b) => b.revenue - a.revenue);
-}
+export const getAmazonProductPerf = unstable_cache(
+  async (period: string, from?: string, to?: string) => {
+    const supabase = await createServiceClient();
+    const { start, end } = getDateRange(period, from, to);
 
-export async function getAmazonProductPerf(period: string, from?: string, to?: string) {
-  const supabase = await createClient();
-  const { start, end } = getDateRange(period, from, to);
+    const [{ data: orders, error: ordersError }, { data: inventory }] = await Promise.all([
+      supabase.from('amazon_orders').select('asin, sku, quantity, item_price, amazon_fees, fba_fees').gte('purchase_date', start).lte('purchase_date', end),
+      supabase.from('amazon_inventory').select('asin, qty_available').eq('fulfillment', 'fba'),
+    ]);
 
-  const { data: orders, error: ordersError } = await supabase
-    .from("amazon_orders")
-    .select("asin, sku, quantity, item_price, amazon_fees, fba_fees")
-    .gte("purchase_date", start)
-    .lte("purchase_date", end);
+    if (ordersError) throw new Error(`Failed to load amazon orders: ${ordersError.message}`);
 
-  if (ordersError) throw new Error(`Failed to load amazon orders: ${ordersError.message}`);
+    const results = aggregateAmazonProducts(
+      (orders || []).map((o) => ({
+        ...o,
+        quantity: o.quantity || 1,
+        item_price: o.item_price || 0,
+        amazon_fees: o.amazon_fees || 0,
+        fba_fees: o.fba_fees || 0,
+      }))
+    );
 
-  const results = aggregateAmazonProducts(
-    (orders || []).map((o) => ({
-      ...o,
-      quantity: o.quantity || 1,
-      item_price: o.item_price || 0,
-      amazon_fees: o.amazon_fees || 0,
-      fba_fees: o.fba_fees || 0,
-    }))
-  );
+    const invMap = new Map((inventory || []).map((i) => [i.asin, i.qty_available]));
 
-  // Enrich with FBA inventory
-  const { data: inventory } = await supabase
-    .from("amazon_inventory")
-    .select("asin, qty_available")
-    .eq("fulfillment", "fba");
-
-  const invMap = new Map(
-    (inventory || []).map((i) => [i.asin, i.qty_available])
-  );
-
-  return results.map((row) => ({
-    ...row,
-    qtyAvailable: invMap.get(row.asin) ?? null,
-  }));
-}
+    return results.map((row) => ({ ...row, qtyAvailable: invMap.get(row.asin) ?? null }));
+  },
+  ['amazon-product-perf'],
+  { revalidate: 1800, tags: ['dashboard-data'] }
+);
