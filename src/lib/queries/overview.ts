@@ -102,9 +102,11 @@ export const getTopProducts = unstable_cache(
     const supabase = await createServiceClient();
     const { start, end } = getDateRange(period, from, to);
 
+    // RPC fetches top 10 Shopify products (not 5) so that after merging with
+    // Amazon the combined top-5 by revenue is accurate across both channels.
     const [{ data: shopifyTop }, { data: amazonOrders }] = await Promise.all([
       supabase.rpc('get_top_products', { p_start: start, p_end: end, p_limit: 10 }),
-      supabase.from('amazon_orders').select('asin, sku, quantity, item_price').gte('purchase_date', start).lte('purchase_date', end),
+      supabase.from('amazon_orders').select('asin, sku, quantity, item_price').gte('purchase_date', start).lte('purchase_date', end).limit(500),
     ]);
 
     const shopifyResults = (shopifyTop || []).map((r: { title: string; units: unknown; revenue: unknown; store_name: string }) => ({
