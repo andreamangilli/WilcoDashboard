@@ -11,6 +11,7 @@ import {
 import { OrderRow } from "@/components/order-row";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface Props {
   searchParams: Promise<{
@@ -22,6 +23,26 @@ interface Props {
     page?: string;
   }>;
 }
+
+const CHANNEL_OPTIONS = [
+  { value: "all",     label: "Tutti i canali" },
+  { value: "shopify", label: "Shopify" },
+  { value: "amazon",  label: "Amazon" },
+] as const;
+
+const SHOPIFY_STATUSES = [
+  { value: "all",      label: "Tutti" },
+  { value: "paid",     label: "Pagati" },
+  { value: "pending",  label: "In Attesa" },
+  { value: "refunded", label: "Rimborsati" },
+];
+
+const AMAZON_STATUSES = [
+  { value: "all",       label: "Tutti" },
+  { value: "Shipped",   label: "Spediti" },
+  { value: "Unshipped", label: "In Attesa" },
+  { value: "Pending",   label: "Pending" },
+];
 
 export default async function OrdiniPage({ searchParams }: Props) {
   const {
@@ -39,10 +60,10 @@ export default async function OrdiniPage({ searchParams }: Props) {
     to,
     channel as "all" | "shopify" | "amazon",
     status,
-    parseInt(page)
+    parseInt(page, 10)
   );
 
-  const currentPage = parseInt(page);
+  const currentPage = parseInt(page, 10);
   const totalPages = Math.ceil(total / pageSize);
 
   function buildUrl(overrides: Record<string, string>) {
@@ -58,77 +79,110 @@ export default async function OrdiniPage({ searchParams }: Props) {
     return `?${params.toString()}`;
   }
 
+  const statusOptions =
+    channel === "shopify"
+      ? SHOPIFY_STATUSES
+      : channel === "amazon"
+        ? AMAZON_STATUSES
+        : null;
+
   return (
     <div>
       <PageHeader title="Ordini" description={`${total} ordini trovati`}>
         <DateRangePicker />
       </PageHeader>
 
-      {/* Channel filter */}
-      <div className="mb-4 flex gap-2">
-        {(["all", "shopify", "amazon"] as const).map((c) => (
-          <Link
-            key={c}
-            href={buildUrl({ channel: c, page: "1" })}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              channel === c
-                ? "bg-gray-900 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {c === "all" ? "Tutti" : c === "shopify" ? "Shopify" : "Amazon"}
-          </Link>
-        ))}
+      {/* Filters row */}
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        {/* Channel filter */}
+        <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
+          {CHANNEL_OPTIONS.map((c) => (
+            <Link
+              key={c.value}
+              href={buildUrl({ channel: c.value, status: "all" })}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-semibold transition-all",
+                channel === c.value
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-800"
+              )}
+            >
+              {c.label}
+            </Link>
+          ))}
+        </div>
+
+        {/* Status filter — only shown when a specific channel is selected */}
+        {statusOptions && (
+          <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
+            {statusOptions.map((s) => (
+              <Link
+                key={s.value}
+                href={buildUrl({ status: s.value })}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-semibold transition-all",
+                  status === s.value
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-800"
+                )}
+              >
+                {s.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-6" />
-            <TableHead>Data</TableHead>
-            <TableHead>N° Ordine</TableHead>
-            <TableHead>Canale</TableHead>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Prodotti</TableHead>
-            <TableHead className="text-right">Totale</TableHead>
-            <TableHead>Stato</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {orders.length === 0 ? (
-            <TableRow>
-              <td
-                colSpan={8}
-                className="py-8 text-center text-sm text-gray-500"
-              >
-                Nessun ordine trovato per il periodo selezionato.
-              </td>
+      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-gray-50 hover:bg-gray-50">
+              <TableHead className="w-6" />
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Data</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">N° Ordine</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Canale</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Cliente</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Prodotti</TableHead>
+              <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Totale</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Stato</TableHead>
             </TableRow>
-          ) : (
-            orders.map((order) => <OrderRow key={order.id} order={order} />)
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {orders.length === 0 ? (
+              <TableRow>
+                <td
+                  colSpan={8}
+                  className="py-12 text-center text-sm text-gray-400"
+                >
+                  Nessun ordine trovato per il periodo selezionato.
+                </td>
+              </TableRow>
+            ) : (
+              orders.map((order) => <OrderRow key={order.id} order={order} />)
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
           <span>
-            Pagina {currentPage} di {totalPages} ({total} ordini totali)
+            Pagina {currentPage} di {totalPages} · {total} ordini totali
           </span>
           <div className="flex gap-2">
             {currentPage > 1 && (
               <Link href={buildUrl({ page: String(currentPage - 1) })}>
-                <Button variant="outline" size="sm">
-                  Precedente
+                <Button variant="outline" size="sm" className="rounded-lg">
+                  ← Precedente
                 </Button>
               </Link>
             )}
             {currentPage < totalPages && (
               <Link href={buildUrl({ page: String(currentPage + 1) })}>
-                <Button variant="outline" size="sm">
-                  Successiva
+                <Button variant="outline" size="sm" className="rounded-lg">
+                  Successiva →
                 </Button>
               </Link>
             )}

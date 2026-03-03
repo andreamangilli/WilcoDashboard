@@ -45,28 +45,33 @@ export default async function DashboardPage({ searchParams }: Props) {
           value={kpis.revenue.value}
           format="currency"
           change={kpis.revenue.change}
+          variant="green"
         />
         <KpiCard
           title="Ordini Totali"
           value={kpis.orders.value}
           format="number"
           change={kpis.orders.change}
+          variant="blue"
         />
         <KpiCard
           title="AOV"
           value={aov}
           format="currency"
+          variant="violet"
         />
         <KpiCard
           title="Spesa Ads"
           value={kpis.adSpend.value}
           format="currency"
           change={kpis.adSpend.change}
+          variant="amber"
         />
         <KpiCard
           title="ROAS Complessivo"
           value={totalAdRoas}
           format="number"
+          variant="rose"
         />
       </div>
 

@@ -14,7 +14,6 @@ import {
   BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -38,11 +37,20 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r bg-white">
-      <div className="flex h-16 items-center border-b px-6">
-        <h1 className="text-lg font-bold">Wilco Group</h1>
+    <aside className="flex h-screen w-60 flex-col bg-gray-950 border-r border-white/[0.06]">
+      {/* Logo */}
+      <div className="flex h-16 items-center gap-3 px-5 border-b border-white/[0.06]">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 shrink-0">
+          <span className="text-xs font-bold text-white">W</span>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white leading-tight">Wilco Group</p>
+          <p className="text-[10px] text-gray-500 leading-tight mt-0.5">Analytics</p>
+        </div>
       </div>
-      <nav className="flex-1 space-y-1 p-4">
+
+      {/* Nav */}
+      <nav className="flex-1 py-3 px-2.5 space-y-0.5">
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -52,27 +60,33 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                 isActive
-                  ? "bg-gray-100 text-gray-900"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  ? "bg-white/10 text-white"
+                  : "text-gray-500 hover:bg-white/[0.05] hover:text-gray-200"
               )}
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  isActive ? "text-amber-400" : "text-current"
+                )}
+              />
               {item.label}
             </Link>
           );
         })}
       </nav>
-      <div className="border-t p-4">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3"
+
+      {/* Footer */}
+      <div className="border-t border-white/[0.06] p-2.5">
+        <button
           onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-all hover:bg-white/[0.05] hover:text-gray-200"
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-4 w-4 shrink-0" />
           Esci
-        </Button>
+        </button>
       </div>
     </aside>
   );
