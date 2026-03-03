@@ -6,7 +6,6 @@ import {
   calculateAmazonPnl,
   AmazonCredentials,
 } from "@/lib/sync/amazon";
-import { logSyncStart, logSyncSuccess, logSyncError } from "@/lib/sync/utils";
 import { decrypt } from "@/lib/crypto";
 
 export const maxDuration = 300;
@@ -15,6 +14,17 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Optional backfill date range in request body
+  let fromDate: string | undefined;
+  let toDate: string | undefined;
+  try {
+    const body = await request.json().catch(() => ({}));
+    fromDate = body.from_date;
+    toDate = body.to_date;
+  } catch {
+    // no body, normal sync
   }
 
   const supabase = await createServiceClient();
@@ -36,18 +46,20 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    const logId = await logSyncStart(`amazon_${account.name}`);
-
     try {
-      const orders = await syncAmazonOrders(account.id, account.marketplace_id, creds);
+      const orders = await syncAmazonOrders(
+        account.id,
+        account.marketplace_id,
+        creds,
+        fromDate,
+        toDate
+      );
       const inventory = await syncAmazonInventory(account.id, account.marketplace_id, creds);
       await calculateAmazonPnl(account.id);
 
-      await logSyncSuccess(logId, orders + inventory);
       results[account.name] = { orders, inventory, pnl: "calculated" };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
-      await logSyncError(logId, message);
       results[account.name] = { error: message };
     }
   }

@@ -1,7 +1,9 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { sleep } from "./utils";
+import { sleep, logSyncStart, logSyncSuccess, logSyncError } from "./utils";
 
 const AMAZON_SP_API_BASE = "https://sellingpartnerapi-eu.amazon.com";
+const AMAZON_DEFAULT_SYNC_SINCE = "2025-01-01T00:00:00Z";
+const AMAZON_SYNC_BUFFER_SECONDS = 30;
 
 export interface AmazonCredentials {
   client_id: string;
@@ -50,55 +52,97 @@ async function amazonFetch(accessToken: string, path: string, params: Record<str
   return res.json();
 }
 
+async function getLastAmazonSyncTime(source: string): Promise<string> {
+  const supabase = await createServiceClient();
+  const { data: lastSync } = await supabase
+    .from("sync_log")
+    .select("completed_at")
+    .eq("source", source)
+    .eq("status", "success")
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (lastSync?.completed_at) {
+    const date = new Date(lastSync.completed_at);
+    date.setSeconds(date.getSeconds() - AMAZON_SYNC_BUFFER_SECONDS);
+    return date.toISOString();
+  }
+  return AMAZON_DEFAULT_SYNC_SINCE;
+}
+
 export async function syncAmazonOrders(
   accountId: string,
   marketplaceId: string,
-  credentials: AmazonCredentials
+  credentials: AmazonCredentials,
+  fromDate?: string,
+  toDate?: string
 ) {
-  const supabase = await createServiceClient();
-  const accessToken = await getAmazonAccessToken(credentials);
+  const source = `amazon_orders_${accountId}${fromDate ? "_backfill" : ""}`;
+  const logId = await logSyncStart(source);
 
-  const createdAfter = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const supabase = await createServiceClient();
+    const accessToken = await getAmazonAccessToken(credentials);
 
-  const data = await amazonFetch(accessToken, "/orders/v0/orders", {
-    MarketplaceIds: marketplaceId,
-    CreatedAfter: createdAfter,
-    OrderStatuses: "Shipped,Unshipped",
-  });
+    const createdAfter = fromDate ?? (await getLastAmazonSyncTime(`amazon_orders_${accountId}`));
+    const createdBefore = toDate ?? new Date().toISOString();
 
-  let synced = 0;
-  const orders = data.payload?.Orders || [];
+    let synced = 0;
+    let nextToken: string | undefined;
 
-  for (const order of orders) {
-    const itemsData = await amazonFetch(
-      accessToken,
-      `/orders/v0/orders/${order.AmazonOrderId}/orderItems`
-    );
-    const items = itemsData.payload?.OrderItems || [];
+    do {
+      // When using NextToken, only pass the token (Amazon ignores other params)
+      const params: Record<string, string> = nextToken
+        ? { NextToken: nextToken }
+        : {
+            MarketplaceIds: marketplaceId,
+            CreatedAfter: createdAfter,
+            CreatedBefore: createdBefore,
+            OrderStatuses: "Shipped,Unshipped,Pending",
+          };
 
-    for (const item of items) {
-      await supabase.from("amazon_orders").upsert(
-        {
-          account_id: accountId,
-          amazon_order_id: `${order.AmazonOrderId}_${item.ASIN}`,
-          asin: item.ASIN,
-          sku: item.SellerSKU,
-          quantity: item.QuantityOrdered || 1,
-          item_price: parseFloat(item.ItemPrice?.Amount || "0"),
-          amazon_fees: parseFloat(item.ItemFee?.Amount || "0"),
-          fba_fees: parseFloat(item.FBAFees?.Amount || "0"),
-          shipping_cost: parseFloat(item.ShippingPrice?.Amount || "0"),
-          order_status: order.OrderStatus,
-          fulfillment_channel: order.FulfillmentChannel,
-          purchase_date: order.PurchaseDate,
-        },
-        { onConflict: "amazon_order_id" }
-      );
-      synced++;
-    }
+      const data = await amazonFetch(accessToken, "/orders/v0/orders", params);
+      const orders = data.payload?.Orders || [];
+      nextToken = data.payload?.NextToken;
+
+      for (const order of orders) {
+        const itemsData = await amazonFetch(
+          accessToken,
+          `/orders/v0/orders/${order.AmazonOrderId}/orderItems`
+        );
+        const items = itemsData.payload?.OrderItems || [];
+
+        for (const item of items) {
+          await supabase.from("amazon_orders").upsert(
+            {
+              account_id: accountId,
+              amazon_order_id: `${order.AmazonOrderId}_${item.ASIN}`,
+              asin: item.ASIN,
+              sku: item.SellerSKU,
+              quantity: item.QuantityOrdered || 1,
+              item_price: parseFloat(item.ItemPrice?.Amount || "0"),
+              amazon_fees: parseFloat(item.ItemFee?.Amount || "0"),
+              fba_fees: parseFloat(item.FBAFees?.Amount || "0"),
+              shipping_cost: parseFloat(item.ShippingPrice?.Amount || "0"),
+              order_status: order.OrderStatus,
+              fulfillment_channel: order.FulfillmentChannel,
+              purchase_date: order.PurchaseDate,
+            },
+            { onConflict: "amazon_order_id" }
+          );
+          synced++;
+        }
+      }
+    } while (nextToken);
+
+    await logSyncSuccess(logId, synced);
+    return synced;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    await logSyncError(logId, message);
+    throw err;
   }
-
-  return synced;
 }
 
 export async function syncAmazonInventory(
@@ -106,39 +150,49 @@ export async function syncAmazonInventory(
   marketplaceId: string,
   credentials: AmazonCredentials
 ) {
-  const supabase = await createServiceClient();
-  const accessToken = await getAmazonAccessToken(credentials);
+  const source = `amazon_inventory_${accountId}`;
+  const logId = await logSyncStart(source);
 
-  const data = await amazonFetch(
-    accessToken,
-    "/fba/inventory/v1/summaries",
-    {
-      granularityType: "Marketplace",
-      granularityId: marketplaceId,
-      marketplaceIds: marketplaceId,
-    }
-  );
+  try {
+    const supabase = await createServiceClient();
+    const accessToken = await getAmazonAccessToken(credentials);
 
-  let synced = 0;
-  const summaries = data.payload?.inventorySummaries || [];
-
-  for (const inv of summaries) {
-    await supabase.from("amazon_inventory").upsert(
+    const data = await amazonFetch(
+      accessToken,
+      "/fba/inventory/v1/summaries",
       {
-        account_id: accountId,
-        asin: inv.asin,
-        sku: inv.sellerSku,
-        fulfillment: inv.condition === "FBA" ? "fba" : "fbm",
-        qty_available: inv.inventoryDetails?.fulfillableQuantity || 0,
-        qty_inbound: inv.inventoryDetails?.inboundWorkingQuantity || 0,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "account_id,asin,fulfillment" }
+        granularityType: "Marketplace",
+        granularityId: marketplaceId,
+        marketplaceIds: marketplaceId,
+      }
     );
-    synced++;
-  }
 
-  return synced;
+    let synced = 0;
+    const summaries = data.payload?.inventorySummaries || [];
+
+    for (const inv of summaries) {
+      await supabase.from("amazon_inventory").upsert(
+        {
+          account_id: accountId,
+          asin: inv.asin,
+          sku: inv.sellerSku,
+          fulfillment: inv.condition === "FBA" ? "fba" : "fbm",
+          qty_available: inv.inventoryDetails?.fulfillableQuantity || 0,
+          qty_inbound: inv.inventoryDetails?.inboundWorkingQuantity || 0,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "account_id,asin,fulfillment" }
+      );
+      synced++;
+    }
+
+    await logSyncSuccess(logId, synced);
+    return synced;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    await logSyncError(logId, message);
+    throw err;
+  }
 }
 
 export async function calculateAmazonPnl(accountId: string) {
