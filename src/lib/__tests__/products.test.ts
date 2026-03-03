@@ -22,6 +22,7 @@ describe("aggregateLineItems", () => {
     expect(shampoo).toBeDefined();
     expect(shampoo!.units).toBe(3);
     expect(shampoo!.revenue).toBeCloseTo(45, 1);
+    expect(shampoo!.ordersCount).toBe(2); // appears in 2 separate orders
     expect(result).toHaveLength(2);
   });
 });

@@ -30,6 +30,8 @@ type RawLineItem = {
   price?: string | number;
 };
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 export function aggregateLineItems(
   orders: Array<{ line_items: unknown; total: unknown }>,
   storeName: string
@@ -38,14 +40,13 @@ export function aggregateLineItems(
 
   for (const order of orders) {
     const items = (order.line_items as RawLineItem[]) || [];
-    const seenTitlesInOrder = new Set<string>();
+    const seenInOrder = new Set<string>();
 
     for (const li of items) {
       const title = li.title || "—";
       const key = `${storeName}::${title}`;
       const qty = li.quantity || 1;
       const price = parseFloat(String(li.price || "0"));
-      const lineRevenue = qty * price;
 
       if (!map.has(key)) {
         map.set(key, {
@@ -60,10 +61,10 @@ export function aggregateLineItems(
       }
       const entry = map.get(key)!;
       entry.units += qty;
-      entry.revenue += lineRevenue;
-      if (!seenTitlesInOrder.has(key)) {
+      entry.revenue = round2(entry.revenue + qty * price);
+      if (!seenInOrder.has(key)) {
         entry.ordersCount += 1;
-        seenTitlesInOrder.add(key);
+        seenInOrder.add(key);
       }
     }
   }
@@ -99,14 +100,14 @@ export function aggregateAmazonProducts(
     }
     const entry = map.get(o.asin)!;
     entry.units += o.quantity || 1;
-    entry.revenue += o.item_price || 0;
-    entry.totalFees += (o.amazon_fees || 0) + (o.fba_fees || 0);
+    entry.revenue = round2(entry.revenue + (o.item_price || 0));
+    entry.totalFees = round2(entry.totalFees + (o.amazon_fees || 0) + (o.fba_fees || 0));
   }
 
   for (const entry of map.values()) {
-    entry.netMargin = entry.revenue - entry.totalFees;
-    entry.feePercent = entry.revenue > 0 ? (entry.totalFees / entry.revenue) * 100 : 0;
-    entry.netMarginPct = entry.revenue > 0 ? (entry.netMargin / entry.revenue) * 100 : 0;
+    entry.netMargin = round2(entry.revenue - entry.totalFees);
+    entry.feePercent = entry.revenue > 0 ? round2((entry.totalFees / entry.revenue) * 100) : 0;
+    entry.netMarginPct = entry.revenue > 0 ? round2((entry.netMargin / entry.revenue) * 100) : 0;
   }
 
   return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
@@ -119,9 +120,7 @@ export async function getShopifyProductPerf(period: string, from?: string, to?: 
   const { data: stores, error: storesError } = await supabase.from("stores").select("id, name");
   if (storesError) throw new Error(`Failed to load stores: ${storesError.message}`);
 
-  const results: ShopifyProductPerf[] = [];
-
-  await Promise.all(
+  const perStoreResults = await Promise.all(
     (stores || []).map(async (store) => {
       const { data: orders, error: ordersError } = await supabase
         .from("shopify_orders")
@@ -135,24 +134,30 @@ export async function getShopifyProductPerf(period: string, from?: string, to?: 
 
       const aggregated = aggregateLineItems(orders || [], store.name);
 
-      // Enrich with current inventory
+      // Enrich with current inventory — keyed by sku (more precise) with title as fallback
       const { data: products } = await supabase
         .from("shopify_products")
         .select("title, sku, inventory_qty")
         .eq("store_id", store.id);
 
-      const inventoryMap = new Map(
+      const inventoryByTitle = new Map(
         (products || []).map((p) => [p.title, p.inventory_qty])
       );
+      const inventoryBySku = new Map(
+        (products || []).filter((p) => p.sku).map((p) => [p.sku, p.inventory_qty])
+      );
 
-      for (const row of aggregated) {
-        row.inventoryQty = inventoryMap.get(row.title) ?? null;
-        results.push(row);
-      }
+      return aggregated.map((row) => ({
+        ...row,
+        inventoryQty:
+          (row.sku ? inventoryBySku.get(row.sku) : undefined) ??
+          inventoryByTitle.get(row.title) ??
+          null,
+      }));
     })
   );
 
-  return results.sort((a, b) => b.revenue - a.revenue);
+  return perStoreResults.flat().sort((a, b) => b.revenue - a.revenue);
 }
 
 export async function getAmazonProductPerf(period: string, from?: string, to?: string) {
@@ -187,9 +192,8 @@ export async function getAmazonProductPerf(period: string, from?: string, to?: s
     (inventory || []).map((i) => [i.asin, i.qty_available])
   );
 
-  for (const row of results) {
-    row.qtyAvailable = invMap.get(row.asin) ?? null;
-  }
-
-  return results;
+  return results.map((row) => ({
+    ...row,
+    qtyAvailable: invMap.get(row.asin) ?? null,
+  }));
 }
