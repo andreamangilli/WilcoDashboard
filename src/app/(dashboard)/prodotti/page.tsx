@@ -77,13 +77,13 @@ export default async function ProdottiPage({ searchParams }: Props) {
           <TableBody>
             {shopifyData.length === 0 ? (
               <TableRow>
-                <td colSpan={6} className="py-8 text-center text-sm text-gray-500">
+                <TableCell colSpan={6} className="py-8 text-center text-sm text-gray-500">
                   Nessun dato per il periodo selezionato.
-                </td>
+                </TableCell>
               </TableRow>
             ) : (
-              shopifyData.map((p, i) => (
-                <TableRow key={i}>
+              shopifyData.map((p) => (
+                <TableRow key={`${p.storeName}::${p.title}`}>
                   <TableCell className="font-medium">{p.title}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">{p.storeName}</Badge>
@@ -132,13 +132,13 @@ export default async function ProdottiPage({ searchParams }: Props) {
           <TableBody>
             {amazonData.length === 0 ? (
               <TableRow>
-                <td colSpan={7} className="py-8 text-center text-sm text-gray-500">
+                <TableCell colSpan={7} className="py-8 text-center text-sm text-gray-500">
                   Nessun dato per il periodo selezionato.
-                </td>
+                </TableCell>
               </TableRow>
             ) : (
-              amazonData.map((p, i) => (
-                <TableRow key={i}>
+              amazonData.map((p) => (
+                <TableRow key={p.asin}>
                   <TableCell className="font-mono text-xs">{p.asin}</TableCell>
                   <TableCell className="text-sm text-gray-500">{p.sku ?? "—"}</TableCell>
                   <TableCell className="text-right">{formatNumber(p.units)}</TableCell>
