@@ -10,19 +10,23 @@ import type { UnifiedOrder } from "@/lib/queries/orders";
 
 function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   const s = status.toLowerCase();
-  if (s === "paid" || s === "shipped" || s === "unshipped") return "default";
+  if (s === "paid" || s === "shipped") return "default";
   if (s === "refunded" || s === "cancelled") return "destructive";
   return "secondary";
 }
 
+const CHANNEL_PALETTE = [
+  "bg-green-100 text-green-800",
+  "bg-blue-100 text-blue-800",
+  "bg-purple-100 text-purple-800",
+  "bg-yellow-100 text-yellow-800",
+  "bg-pink-100 text-pink-800",
+];
+
 function channelColor(source: string, name: string) {
   if (source === "amazon") return "bg-orange-100 text-orange-800";
-  const colors: Record<string, string> = {
-    Vitaminity: "bg-green-100 text-green-800",
-    KMax: "bg-blue-100 text-blue-800",
-    HairShopEurope: "bg-purple-100 text-purple-800",
-  };
-  return colors[name] ?? "bg-gray-100 text-gray-800";
+  const index = [...name].reduce((acc, c) => acc + c.charCodeAt(0), 0) % CHANNEL_PALETTE.length;
+  return CHANNEL_PALETTE[index];
 }
 
 export function OrderRow({ order }: { order: UnifiedOrder }) {
@@ -32,11 +36,21 @@ export function OrderRow({ order }: { order: UnifiedOrder }) {
   const itemCount = order.source === "shopify" ? order.lineItems.length : 1;
   const dateStr = new Date(order.date).toLocaleDateString("it-IT");
 
+  function toggle() {
+    setExpanded((v) => !v);
+  }
+
   return (
     <>
       <TableRow
         className="cursor-pointer hover:bg-gray-50"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={toggle}
+        aria-expanded={expanded}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") toggle();
+        }}
       >
         <TableCell className="w-6">
           {expanded ? (
@@ -60,7 +74,9 @@ export function OrderRow({ order }: { order: UnifiedOrder }) {
         <TableCell className="text-sm text-gray-500">
           {order.source === "shopify" ? order.customerEmail ?? "—" : "—"}
         </TableCell>
-        <TableCell className="text-sm">{itemCount} {itemCount === 1 ? "item" : "items"}</TableCell>
+        <TableCell className="text-sm">
+          {itemCount} {itemCount === 1 ? "articolo" : "articoli"}
+        </TableCell>
         <TableCell className="text-right font-medium">{formatCurrency(order.total)}</TableCell>
         <TableCell>
           <Badge variant={statusVariant(order.status)} className="text-xs">
@@ -84,14 +100,22 @@ export function OrderRow({ order }: { order: UnifiedOrder }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {order.lineItems.map((li, i) => (
-                      <tr key={i} className="border-t border-gray-100">
-                        <td className="py-1">{li.title}</td>
-                        <td className="py-1 text-gray-500">{li.sku ?? "—"}</td>
-                        <td className="py-1 text-right">{li.quantity}</td>
-                        <td className="py-1 text-right">{formatCurrency(li.price)}</td>
+                    {order.lineItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-1 text-xs text-gray-400">
+                          Nessun articolo
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      order.lineItems.map((li, i) => (
+                        <tr key={li.sku ?? `item-${i}`} className="border-t border-gray-100">
+                          <td className="py-1">{li.title}</td>
+                          <td className="py-1 text-gray-500">{li.sku ?? "—"}</td>
+                          <td className="py-1 text-right">{li.quantity}</td>
+                          <td className="py-1 text-right">{formatCurrency(li.price)}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               ) : (
