@@ -59,7 +59,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         />
         <KpiCard
           title="Spesa Ads"
-          value={totalAdSpend}
+          value={kpis.adSpend.value}
           format="currency"
           change={kpis.adSpend.change}
         />
@@ -96,8 +96,8 @@ export default async function DashboardPage({ searchParams }: Props) {
                       ⚠ Stock Basso
                     </p>
                     <ul className="space-y-1">
-                      {signals.lowStockSkus.slice(0, 5).map((s, i) => (
-                        <li key={i} className="text-sm text-gray-700">
+                      {signals.lowStockSkus.slice(0, 5).map((s) => (
+                        <li key={`${s.channel}-${s.name}`} className="text-sm text-gray-700">
                           {s.name}{" "}
                           <span className="text-red-600 font-medium">
                             ({s.qty} pz — {s.channel})
@@ -113,8 +113,8 @@ export default async function DashboardPage({ searchParams }: Props) {
                       📉 ROAS Basso (7gg)
                     </p>
                     <ul className="space-y-1">
-                      {signals.lowRoasCampaigns.slice(0, 3).map((c, i) => (
-                        <li key={i} className="text-sm text-gray-700">
+                      {signals.lowRoasCampaigns.slice(0, 3).map((c) => (
+                        <li key={c.name} className="text-sm text-gray-700">
                           {c.name}
                         </li>
                       ))}
@@ -149,7 +149,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </thead>
                 <tbody>
                   {topProducts.map((p, i) => (
-                    <tr key={i} className="border-b last:border-0">
+                    <tr key={`${p.channel}-${p.title}`} className="border-b last:border-0">
                       <td className="py-2 text-gray-400">{i + 1}</td>
                       <td className="py-2 font-medium">{p.title}</td>
                       <td className="py-2 text-gray-500">{p.channel}</td>
