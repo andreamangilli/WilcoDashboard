@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getDateRange } from "./utils";
 
-export async function getOverviewKpis(period: string) {
+export async function getOverviewKpis(period: string, from?: string, to?: string) {
   const supabase = await createClient();
-  const { start, end, prevStart, prevEnd } = getDateRange(period);
+  const { start, end, prevStart, prevEnd } = getDateRange(period, from, to);
 
   // Current period - Shopify revenue
   const { data: currentShopify } = await supabase
@@ -94,9 +94,9 @@ export async function getOverviewKpis(period: string) {
   };
 }
 
-export async function getRevenueByChannel(period: string) {
+export async function getRevenueByChannel(period: string, from?: string, to?: string) {
   const supabase = await createClient();
-  const { start, end } = getDateRange(period);
+  const { start, end } = getDateRange(period, from, to);
 
   const { data: stores } = await supabase
     .from("stores")

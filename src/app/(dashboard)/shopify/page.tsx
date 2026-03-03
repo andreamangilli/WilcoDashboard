@@ -6,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 
 interface Props {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }
 
 export default async function ShopifyPage({ searchParams }: Props) {
-  const { period = "30d" } = await searchParams;
-  const stores = await getShopifyAllStoresKpis(period);
+  const { period = "30d", from, to } = await searchParams;
+  const stores = await getShopifyAllStoresKpis(period, from, to);
 
   return (
     <div>

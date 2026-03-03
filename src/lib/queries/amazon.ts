@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getDateRange } from "./utils";
 
-export async function getAmazonKpis(period: string) {
+export async function getAmazonKpis(period: string, from?: string, to?: string) {
   const supabase = await createClient();
-  const { start, end, prevStart, prevEnd } = getDateRange(period);
+  const { start, end, prevStart, prevEnd } = getDateRange(period, from, to);
 
   const { data: current } = await supabase
     .from("amazon_orders")

@@ -8,17 +8,17 @@ import { Button } from "@/components/ui/button";
 
 interface Props {
   params: Promise<{ store: string }>;
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }
 
 export default async function StoreDetailPage({ params, searchParams }: Props) {
   const { store: slug } = await params;
-  const { period = "30d" } = await searchParams;
+  const { period = "30d", from, to } = await searchParams;
 
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
 
-  const kpis = await getShopifyStoreKpis(store.id, period);
+  const kpis = await getShopifyStoreKpis(store.id, period, from, to);
 
   return (
     <div>

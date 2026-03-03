@@ -6,12 +6,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 interface Props {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }
 
 export default async function AmazonPage({ searchParams }: Props) {
-  const { period = "30d" } = await searchParams;
-  const kpis = await getAmazonKpis(period);
+  const { period = "30d", from, to } = await searchParams;
+  const kpis = await getAmazonKpis(period, from, to);
 
   return (
     <div>

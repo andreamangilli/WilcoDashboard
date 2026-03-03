@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getDateRange } from "./utils";
 
-export async function getShopifyStoreKpis(storeId: string, period: string) {
+export async function getShopifyStoreKpis(storeId: string, period: string, from?: string, to?: string) {
   const supabase = await createClient();
-  const { start, end, prevStart, prevEnd } = getDateRange(period);
+  const { start, end, prevStart, prevEnd } = getDateRange(period, from, to);
 
   const { data: current } = await supabase
     .from("shopify_orders")
@@ -46,7 +46,7 @@ export async function getShopifyStoreKpis(storeId: string, period: string) {
   };
 }
 
-export async function getShopifyAllStoresKpis(period: string) {
+export async function getShopifyAllStoresKpis(period: string, from?: string, to?: string) {
   const supabase = await createClient();
   const { data: stores } = await supabase
     .from("stores")
@@ -54,7 +54,7 @@ export async function getShopifyAllStoresKpis(period: string) {
 
   const storeKpis = [];
   for (const store of stores || []) {
-    const kpis = await getShopifyStoreKpis(store.id, period);
+    const kpis = await getShopifyStoreKpis(store.id, period, from, to);
     storeKpis.push({ ...store, ...kpis });
   }
   return storeKpis;

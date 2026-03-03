@@ -7,14 +7,14 @@ import { formatCurrency } from "@/lib/format";
 import { SpendChart } from "../spend-chart";
 
 interface Props {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }
 
 export default async function GoogleAdsPage({ searchParams }: Props) {
-  const { period = "30d" } = await searchParams;
+  const { period = "30d", from, to } = await searchParams;
   const [campaigns, dailySpend] = await Promise.all([
     getAdsCampaigns("google"),
-    getAdsDailySpend("google", period),
+    getAdsDailySpend("google", period, from, to),
   ]);
 
   return (

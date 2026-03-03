@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getDateRange } from "./utils";
 
-export async function getAdsOverview(period: string) {
+export async function getAdsOverview(period: string, from?: string, to?: string) {
   const supabase = await createClient();
-  const { start, end } = getDateRange(period);
+  const { start, end } = getDateRange(period, from, to);
   const startDate = start.split("T")[0];
   const endDate = end.split("T")[0];
 
@@ -91,10 +91,12 @@ export async function getAdsCampaigns(platform: "google" | "meta") {
 
 export async function getAdsDailySpend(
   platform: "google" | "meta",
-  period: string
+  period: string,
+  from?: string,
+  to?: string
 ) {
   const supabase = await createClient();
-  const { start, end } = getDateRange(period);
+  const { start, end } = getDateRange(period, from, to);
 
   const { data: accounts } = await supabase
     .from("ad_accounts")

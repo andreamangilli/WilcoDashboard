@@ -6,14 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RevenueChart } from "./revenue-chart";
 
 interface Props {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }
 
 export default async function DashboardPage({ searchParams }: Props) {
-  const { period = "30d" } = await searchParams;
+  const { period = "30d", from, to } = await searchParams;
   const [kpis, channels] = await Promise.all([
-    getOverviewKpis(period),
-    getRevenueByChannel(period),
+    getOverviewKpis(period, from, to),
+    getRevenueByChannel(period, from, to),
   ]);
 
   return (

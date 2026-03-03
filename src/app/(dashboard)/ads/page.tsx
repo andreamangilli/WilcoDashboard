@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
 
 interface Props {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }
 
 export default async function AdsPage({ searchParams }: Props) {
-  const { period = "30d" } = await searchParams;
-  const overview = await getAdsOverview(period);
+  const { period = "30d", from, to } = await searchParams;
+  const overview = await getAdsOverview(period, from, to);
 
   return (
     <div>
