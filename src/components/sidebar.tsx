@@ -10,12 +10,16 @@ import {
   Megaphone,
   Settings,
   LogOut,
+  ClipboardList,
+  BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/ordini", label: "Ordini", icon: ClipboardList },
+  { href: "/prodotti", label: "Prodotti", icon: BarChart2 },
   { href: "/shopify", label: "Shopify", icon: ShoppingBag },
   { href: "/amazon", label: "Amazon", icon: Package },
   { href: "/ads", label: "Advertising", icon: Megaphone },
