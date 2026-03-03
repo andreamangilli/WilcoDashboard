@@ -145,3 +145,91 @@ export async function getAdsDailySpend(
 
   return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
 }
+
+export type CampaignWithMetrics = {
+  id: string;
+  campaign_id: string;
+  campaign_name: string;
+  status: string;
+  daily_budget: number | null;
+  spend: number;
+  revenue: number;
+  roas: number;
+  cpc: number;
+  conversions: number;
+  clicks: number;
+};
+
+export async function getAdsCampaignsWithMetrics(
+  platform: "google" | "meta",
+  period: string,
+  from?: string,
+  to?: string
+): Promise<CampaignWithMetrics[]> {
+  const supabase = await createClient();
+  const { start, end } = getDateRange(period, from, to);
+  const startDate = start.split("T")[0];
+  const endDate = end.split("T")[0];
+
+  const { data: accounts } = await supabase
+    .from("ad_accounts")
+    .select("id")
+    .eq("platform", platform);
+
+  const accountIds = (accounts || []).map((a) => a.id);
+
+  const { data: campaigns } = await supabase
+    .from("ad_campaigns")
+    .select("*")
+    .in("ad_account_id", accountIds)
+    .order("campaign_name");
+
+  const { data: spendData } = await supabase
+    .from("ad_spend_daily")
+    .select("campaign_id, spend, revenue, clicks, conversions")
+    .in("ad_account_id", accountIds)
+    .gte("date", startDate)
+    .lte("date", endDate);
+
+  // Aggregate spend by campaign_id
+  const spendByCampaign = new Map<
+    string,
+    { spend: number; revenue: number; clicks: number; conversions: number }
+  >();
+
+  for (const row of spendData || []) {
+    const existing = spendByCampaign.get(row.campaign_id) ?? {
+      spend: 0,
+      revenue: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    existing.spend += row.spend || 0;
+    existing.revenue += row.revenue || 0;
+    existing.clicks += row.clicks || 0;
+    existing.conversions += row.conversions || 0;
+    spendByCampaign.set(row.campaign_id, existing);
+  }
+
+  return (campaigns || []).map((c) => {
+    const metrics = spendByCampaign.get(c.campaign_id) ?? {
+      spend: 0,
+      revenue: 0,
+      clicks: 0,
+      conversions: 0,
+    };
+    return {
+      id: c.id,
+      campaign_id: c.campaign_id,
+      campaign_name: c.campaign_name,
+      status: c.status,
+      daily_budget: c.daily_budget,
+      spend: metrics.spend,
+      revenue: metrics.revenue,
+      roas: metrics.spend > 0 ? metrics.revenue / metrics.spend : 0,
+      cpc: metrics.clicks > 0 ? metrics.spend / metrics.clicks : 0,
+      conversions: metrics.conversions,
+      clicks: metrics.clicks,
+    };
+  });
+}
