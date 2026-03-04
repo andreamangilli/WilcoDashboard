@@ -48,7 +48,7 @@ export async function syncMetaAds(
     const insightsRes = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/${campaign.id}/insights?` +
         new URLSearchParams({
-          fields: "spend,impressions,clicks,actions,action_values",
+          fields: "spend,impressions,clicks,actions,action_values,reach,frequency",
           time_range: JSON.stringify({
             since: new Date(Date.now() - 30 * 86400000)
               .toISOString()
@@ -83,6 +83,8 @@ export async function syncMetaAds(
           clicks: parseInt(day.clicks || "0"),
           conversions: parseFloat(conversions),
           revenue: parseFloat(revenue),
+          reach: parseInt(day.reach || "0"),
+          frequency: parseFloat(day.frequency || "0"),
           roas: spend > 0 ? parseFloat(revenue) / spend : 0,
         },
         { onConflict: "ad_account_id,campaign_id,date" }
