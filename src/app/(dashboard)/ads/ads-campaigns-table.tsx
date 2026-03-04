@@ -67,7 +67,7 @@ export function AdsCampaignsTable({ campaigns, platform }: Props) {
     }
   }
 
-  function SortHeader({ label, field }: { label: string; field: SortKey }) {
+  function renderSortHeader(label: string, field: SortKey) {
     const active = sortKey === field;
     return (
       <button
@@ -102,15 +102,15 @@ export function AdsCampaignsTable({ campaigns, platform }: Props) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead><SortHeader label="Campagna" field="campaign_name" /></TableHead>
+            <TableHead>{renderSortHeader("Campagna", "campaign_name")}</TableHead>
             <TableHead>Stato</TableHead>
             <TableHead className="text-right">Budget/g</TableHead>
-            <TableHead className="text-right"><SortHeader label="Spesa" field="spend" /></TableHead>
-            <TableHead className="text-right"><SortHeader label="Revenue" field="revenue" /></TableHead>
-            <TableHead className="text-right"><SortHeader label="ROAS" field="roas" /></TableHead>
-            <TableHead className="text-right"><SortHeader label="CPC" field="cpc" /></TableHead>
-            <TableHead className="text-right"><SortHeader label="Click" field="clicks" /></TableHead>
-            <TableHead className="text-right"><SortHeader label="Conv." field="conversions" /></TableHead>
+            <TableHead className="text-right">{renderSortHeader("Spesa", "spend")}</TableHead>
+            <TableHead className="text-right">{renderSortHeader("Revenue", "revenue")}</TableHead>
+            <TableHead className="text-right">{renderSortHeader("ROAS", "roas")}</TableHead>
+            <TableHead className="text-right">{renderSortHeader("CPC", "cpc")}</TableHead>
+            <TableHead className="text-right">{renderSortHeader("Click", "clicks")}</TableHead>
+            <TableHead className="text-right">{renderSortHeader("Conv.", "conversions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
