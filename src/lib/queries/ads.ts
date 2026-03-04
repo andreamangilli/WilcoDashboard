@@ -145,3 +145,43 @@ export const getAdsDailySpend = unstable_cache(
   ['ads-daily-spend-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
+
+export const getCampaignDailySpend = unstable_cache(
+  async (campaignId: string, period: string, from?: string, to?: string) => {
+    const supabase = await createServiceClient();
+    const { start, end } = getDateRange(period, from, to);
+
+    const { data } = await supabase
+      .from('ad_spend_daily')
+      .select('date, spend, impressions, clicks, conversions, revenue')
+      .eq('campaign_id', campaignId)
+      .gte('date', start.split('T')[0])
+      .lte('date', end.split('T')[0])
+      .order('date');
+
+    return (data || []).map((row) => ({
+      date: row.date,
+      spend: row.spend || 0,
+      impressions: row.impressions || 0,
+      clicks: row.clicks || 0,
+      conversions: row.conversions || 0,
+      revenue: row.revenue || 0,
+    }));
+  },
+  ['campaign-daily-spend-v1'],
+  { revalidate: 1800, tags: ['dashboard-data'] }
+);
+
+export const getCampaignInfo = unstable_cache(
+  async (campaignId: string) => {
+    const supabase = await createServiceClient();
+    const { data } = await supabase
+      .from('ad_campaigns')
+      .select('id, ad_account_id, campaign_id, campaign_name, status, daily_budget')
+      .eq('campaign_id', campaignId)
+      .single();
+    return data;
+  },
+  ['campaign-info-v1'],
+  { revalidate: 1800, tags: ['dashboard-data'] }
+);
