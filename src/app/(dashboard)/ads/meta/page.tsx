@@ -8,17 +8,9 @@ import {
   getAdsCampaignsWithMetrics,
   getAdsDailySpend,
 } from "@/lib/queries/ads";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatNumber } from "@/lib/format";
-import { SpendChart } from "../spend-chart";
+import { AdsMultiChart } from "../ads-multi-chart";
+import { AdsCampaignBreakdown } from "../ads-campaign-breakdown";
+import { AdsCampaignsTable } from "../ads-campaigns-table";
 
 interface Props {
   searchParams: Promise<{ period?: string; from?: string; to?: string }>;
@@ -34,6 +26,9 @@ export default async function MetaAdsPage({ searchParams }: Props) {
 
   const m = overview.meta;
   const cpc = m.clicks > 0 ? m.spend / m.clicks : 0;
+  const ctr = m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0;
+  const cpm = m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 0;
+  const cpa = m.conversions > 0 ? m.spend / m.conversions : 0;
 
   return (
     <div>
@@ -41,68 +36,25 @@ export default async function MetaAdsPage({ searchParams }: Props) {
         <DateRangePicker />
       </PageHeader>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-5">
         <KpiCard title="Spesa" value={m.spend} format="currency" />
-        <KpiCard title="ROAS" value={m.roas} format="number" />
-        <KpiCard title="CPC Medio" value={cpc} format="currency" />
-        <KpiCard title="Conversioni" value={m.conversions} format="number" />
-        <KpiCard title="Ricavo Ads" value={m.revenue} format="currency" />
+        <KpiCard title="Revenue" value={m.revenue} format="currency" variant="green" />
+        <KpiCard title="ROAS" value={m.roas} format="number" variant="violet" />
+        <KpiCard title="CPA" value={cpa} format="currency" variant="amber" />
+        <KpiCard title="Conversioni" value={m.conversions} format="number" variant="rose" />
+      </div>
+      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3">
+        <KpiCard title="CTR" value={ctr} format="percent" />
+        <KpiCard title="CPM" value={cpm} format="currency" />
+        <KpiCard title="CPC" value={cpc} format="currency" />
       </div>
 
-      <div className="mb-8">
-        <SpendChart data={dailySpend} />
+      <div className="mb-8 space-y-6">
+        <AdsMultiChart data={dailySpend} />
+        <AdsCampaignBreakdown data={campaigns} />
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Campagna</TableHead>
-            <TableHead>Stato</TableHead>
-            <TableHead className="text-right">Budget/g</TableHead>
-            <TableHead className="text-right">Spesa</TableHead>
-            <TableHead className="text-right">ROAS</TableHead>
-            <TableHead className="text-right">Conversioni</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {campaigns.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="py-8 text-center text-sm text-gray-500">
-                Nessuna campagna trovata.
-              </TableCell>
-            </TableRow>
-          ) : (
-            campaigns.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.campaign_name}</TableCell>
-                <TableCell>
-                  <Badge variant={c.status === "ACTIVE" ? "default" : "secondary"}>
-                    {c.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  {c.daily_budget ? formatCurrency(c.daily_budget) : "—"}
-                </TableCell>
-                <TableCell className="text-right">{formatCurrency(c.spend)}</TableCell>
-                <TableCell className="text-right">
-                  {c.spend > 0 ? (
-                    <Badge
-                      variant={
-                        c.roas < 2 ? "destructive" : c.roas < 3 ? "outline" : "default"
-                      }
-                    >
-                      {c.roas.toFixed(1)}x
-                    </Badge>
-                  ) : (
-                    "—"
-                  )}
-                </TableCell>
-                <TableCell className="text-right">{formatNumber(c.conversions)}</TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+      <AdsCampaignsTable campaigns={campaigns} platform="meta" />
     </div>
   );
 }
