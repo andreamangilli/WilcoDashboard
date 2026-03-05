@@ -288,3 +288,93 @@ export const getOverviewKpisDaily = unstable_cache(
   ['overview-kpis-daily-v1'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
+
+export type TrendDayData = {
+  date: string;
+  revenue: number;
+  adSpend: number;
+  adsRevenue: number;
+  roas: number;
+};
+
+export const getDailyTrend = unstable_cache(
+  async (period: string, from?: string, to?: string): Promise<{ current: TrendDayData[]; previous: TrendDayData[] }> => {
+    const supabase = await createServiceClient();
+    const { start, end, prevStart, prevEnd } = getDateRange(period, from, to);
+    const startDate = start.split('T')[0];
+    const endDate = end.split('T')[0];
+    const prevStartDate = prevStart.split('T')[0];
+    const prevEndDate = prevEnd.split('T')[0];
+
+    const [shopifyCurr, shopifyPrev, amazonCurr, amazonPrev, adsCurr, adsPrev] = await Promise.all([
+      fetchAll<{ total: number; created_at: string }>(({ from: f, to: t }) =>
+        supabase.from('shopify_orders').select('total, created_at')
+          .gte('created_at', start).lte('created_at', end).eq('financial_status', 'paid').range(f, t)
+      ),
+      fetchAll<{ total: number; created_at: string }>(({ from: f, to: t }) =>
+        supabase.from('shopify_orders').select('total, created_at')
+          .gte('created_at', prevStart).lte('created_at', prevEnd).eq('financial_status', 'paid').range(f, t)
+      ),
+      fetchAll<{ item_price: number; purchase_date: string }>(({ from: f, to: t }) =>
+        supabase.from('amazon_orders').select('item_price, purchase_date')
+          .gte('purchase_date', start).lte('purchase_date', end).range(f, t)
+      ),
+      fetchAll<{ item_price: number; purchase_date: string }>(({ from: f, to: t }) =>
+        supabase.from('amazon_orders').select('item_price, purchase_date')
+          .gte('purchase_date', prevStart).lte('purchase_date', prevEnd).range(f, t)
+      ),
+      fetchAll<{ date: string; spend: number; revenue: number }>(({ from: f, to: t }) =>
+        supabase.from('ad_spend_daily').select('date, spend, revenue')
+          .gte('date', startDate).lte('date', endDate).range(f, t)
+      ),
+      fetchAll<{ date: string; spend: number; revenue: number }>(({ from: f, to: t }) =>
+        supabase.from('ad_spend_daily').select('date, spend, revenue')
+          .gte('date', prevStartDate).lte('date', prevEndDate).range(f, t)
+      ),
+    ]);
+
+    function buildDayMap(
+      shopify: { total: number; created_at: string }[],
+      amazon: { item_price: number; purchase_date: string }[],
+      ads: { date: string; spend: number; revenue: number }[]
+    ): Record<string, TrendDayData> {
+      const map: Record<string, TrendDayData> = {};
+
+      const ensure = (date: string) => {
+        if (!map[date]) map[date] = { date, revenue: 0, adSpend: 0, adsRevenue: 0, roas: 0 };
+      };
+
+      for (const o of shopify) {
+        const d = o.created_at.split('T')[0];
+        ensure(d);
+        map[d].revenue += o.total || 0;
+      }
+      for (const o of amazon) {
+        const d = o.purchase_date.split('T')[0];
+        ensure(d);
+        map[d].revenue += o.item_price || 0;
+      }
+      for (const a of ads) {
+        ensure(a.date);
+        map[a.date].adSpend += a.spend || 0;
+        map[a.date].adsRevenue += a.revenue || 0;
+      }
+
+      for (const day of Object.values(map)) {
+        day.roas = day.adSpend > 0 ? day.adsRevenue / day.adSpend : 0;
+      }
+
+      return map;
+    }
+
+    const currentMap = buildDayMap(shopifyCurr, amazonCurr, adsCurr);
+    const previousMap = buildDayMap(shopifyPrev, amazonPrev, adsPrev);
+
+    return {
+      current: Object.values(currentMap).sort((a, b) => a.date.localeCompare(b.date)),
+      previous: Object.values(previousMap).sort((a, b) => a.date.localeCompare(b.date)),
+    };
+  },
+  ['daily-trend-v1'],
+  { revalidate: 1800, tags: ['dashboard-data'] }
+);
