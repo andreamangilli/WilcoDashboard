@@ -14,6 +14,10 @@ export type ShopifyOrderRow = {
   total: number;
   status: string;
   fulfillmentStatus: string | null;
+  shippingCity: string | null;
+  shippingProvince: string | null;
+  shippingCountry: string | null;
+  shippingCountryCode: string | null;
 };
 
 export type AmazonOrderRow = {
@@ -27,6 +31,10 @@ export type AmazonOrderRow = {
   total: number;
   status: string;
   fulfillmentChannel: string;
+  shippingCity: string | null;
+  shippingProvince: string | null;
+  shippingCountry: string | null;
+  shippingCountryCode: string | null;
 };
 
 export type UnifiedOrder = ShopifyOrderRow | AmazonOrderRow;
@@ -72,10 +80,12 @@ export const getUnifiedOrders = unstable_cache(
             id: string; order_number: string; total: number; customer_email: string | null;
             financial_status: string; fulfillment_status: string | null; created_at: string;
             line_items: Array<{ title?: string; sku?: string; quantity?: number; price?: string | number }>;
+            shipping_city: string | null; shipping_province: string | null;
+            shipping_country: string | null; shipping_country_code: string | null;
           }>(({ from: f, to: t }) => {
             let query = supabase
               .from("shopify_orders")
-              .select("id, order_number, total, customer_email, financial_status, fulfillment_status, created_at, line_items")
+              .select("id, order_number, total, customer_email, financial_status, fulfillment_status, created_at, line_items, shipping_city, shipping_province, shipping_country, shipping_country_code")
               .eq("store_id", store.id)
               .gte("created_at", start)
               .lte("created_at", end);
@@ -102,6 +112,10 @@ export const getUnifiedOrders = unstable_cache(
               total: o.total || 0,
               status: o.financial_status,
               fulfillmentStatus: o.fulfillment_status,
+              shippingCity: o.shipping_city,
+              shippingProvince: o.shipping_province,
+              shippingCountry: o.shipping_country,
+              shippingCountryCode: o.shipping_country_code,
             } satisfies ShopifyOrderRow;
           });
         })
@@ -120,10 +134,12 @@ export const getUnifiedOrders = unstable_cache(
           const orders = await fetchAll<{
             id: string; amazon_order_id: string; asin: string; sku: string | null;
             item_price: number; order_status: string; fulfillment_channel: string; purchase_date: string;
+            shipping_city: string | null; shipping_province: string | null;
+            shipping_country: string | null; shipping_country_code: string | null;
           }>(({ from: f, to: t }) => {
             let query = supabase
               .from("amazon_orders")
-              .select("id, amazon_order_id, asin, sku, item_price, order_status, fulfillment_channel, purchase_date")
+              .select("id, amazon_order_id, asin, sku, item_price, order_status, fulfillment_channel, purchase_date, shipping_city, shipping_province, shipping_country, shipping_country_code")
               .eq("account_id", account.id)
               .gte("purchase_date", start)
               .lte("purchase_date", end);
@@ -141,6 +157,10 @@ export const getUnifiedOrders = unstable_cache(
             total: o.item_price || 0,
             status: o.order_status,
             fulfillmentChannel: o.fulfillment_channel,
+            shippingCity: o.shipping_city,
+            shippingProvince: o.shipping_province,
+            shippingCountry: o.shipping_country,
+            shippingCountryCode: o.shipping_country_code,
           } satisfies AmazonOrderRow));
         })
       );
