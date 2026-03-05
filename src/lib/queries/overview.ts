@@ -54,7 +54,7 @@ export const getOverviewKpis = unstable_cache(
       amazonRevenue,
     };
   },
-  ['overview-kpis'],
+  ['overview-kpis-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -93,7 +93,7 @@ export const getRevenueByChannel = unstable_cache(
       },
     ];
   },
-  ['revenue-by-channel'],
+  ['revenue-by-channel-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -128,7 +128,7 @@ export const getTopProducts = unstable_cache(
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
   },
-  ['top-products'],
+  ['top-products-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -174,6 +174,6 @@ export const getOperationalSignals = unstable_cache(
       lowRoasCampaigns: lowRoasCampaigns.map((c) => ({ name: c.campaign_name })),
     };
   },
-  ['operational-signals'],
+  ['operational-signals-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );

@@ -23,7 +23,7 @@ export const getShopifyStoreKpis = unstable_cache(
       aov: { value: orders > 0 ? revenue / orders : 0 },
     };
   },
-  ['shopify-store-kpis'],
+  ['shopify-store-kpis-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -39,7 +39,7 @@ export const getShopifyAllStoresKpis = unstable_cache(
       })
     );
   },
-  ['shopify-all-stores-kpis'],
+  ['shopify-all-stores-kpis-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -49,7 +49,7 @@ export const getShopifyProducts = unstable_cache(
     const { data } = await supabase.from('shopify_products').select('*').eq('store_id', storeId).order('title');
     return data || [];
   },
-  ['shopify-products'],
+  ['shopify-products-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -59,7 +59,7 @@ export const getShopifyCustomers = unstable_cache(
     const { data } = await supabase.from('shopify_customers').select('*').eq('store_id', storeId).order('total_spent', { ascending: false });
     return data || [];
   },
-  ['shopify-customers'],
+  ['shopify-customers-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -69,6 +69,6 @@ export const getStoreBySlug = unstable_cache(
     const { data } = await supabase.from('stores').select('*').eq('slug', slug).single();
     return data;
   },
-  ['store-by-slug'],
+  ['store-by-slug-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );

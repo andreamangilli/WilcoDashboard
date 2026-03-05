@@ -26,7 +26,7 @@ export const getAmazonKpis = unstable_cache(
       fees: { value: totalFees },
     };
   },
-  ['amazon-kpis'],
+  ['amazon-kpis-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -36,7 +36,7 @@ export const getAmazonPnl = unstable_cache(
     const { data } = await supabase.from('amazon_pnl').select('*').order('revenue', { ascending: false });
     return data || [];
   },
-  ['amazon-pnl'],
+  ['amazon-pnl-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -46,6 +46,6 @@ export const getAmazonInventory = unstable_cache(
     const { data } = await supabase.from('amazon_inventory').select('*').order('asin');
     return data || [];
   },
-  ['amazon-inventory'],
+  ['amazon-inventory-v2'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
