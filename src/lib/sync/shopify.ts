@@ -106,6 +106,10 @@ export async function syncShopifyOrders(config: ShopifyStoreConfig): Promise<{ s
             created_at: order.created_at,
             updated_at: order.updated_at,
             line_items: order.line_items,
+            shipping_country: order.shipping_address?.country || null,
+            shipping_country_code: order.shipping_address?.country_code || null,
+            shipping_city: order.shipping_address?.city || null,
+            shipping_province: order.shipping_address?.province || null,
           },
           { onConflict: "store_id,shopify_id" }
         );
