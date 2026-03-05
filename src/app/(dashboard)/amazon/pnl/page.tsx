@@ -1,58 +1,45 @@
-import { PageHeader } from "@/components/page-header";
-import { getAmazonPnl } from "@/lib/queries/amazon";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/format";
+export const dynamic = 'force-dynamic';
 
-export default async function AmazonPnlPage() {
-  const pnl = await getAmazonPnl();
+import { PageHeader } from "@/components/page-header";
+import { DateRangePicker } from "@/components/date-range-picker";
+import { KpiCard } from "@/components/kpi-card";
+import { getAmazonPnlFromOrders } from "@/lib/queries/amazon";
+import { PnlTable } from "./pnl-table";
+
+interface Props {
+  searchParams: Promise<{ period?: string; from?: string; to?: string }>;
+}
+
+export default async function AmazonPnlPage({ searchParams }: Props) {
+  const { period = "30d", from, to } = await searchParams;
+  const rows = await getAmazonPnlFromOrders(period, from, to);
+
+  const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
+  const totalFees = rows.reduce((s, r) => s + r.amazonFees + r.fbaFees + r.shippingCost, 0);
+  const totalProfit = rows.reduce((s, r) => s + r.netProfit, 0);
+  const totalMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
   return (
     <div>
-      <PageHeader title="Amazon P&L" description="Profitto e perdita per ASIN" />
+      <PageHeader title="Amazon P&L" description="Profitto e perdita per ASIN">
+        <DateRangePicker />
+      </PageHeader>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>ASIN</TableHead>
-            <TableHead>SKU</TableHead>
-            <TableHead className="text-right">Fatturato</TableHead>
-            <TableHead className="text-right">Unita</TableHead>
-            <TableHead className="text-right">Fee Amazon</TableHead>
-            <TableHead className="text-right">Fee FBA</TableHead>
-            <TableHead className="text-right">Storage</TableHead>
-            <TableHead className="text-right">Costo Prod.</TableHead>
-            <TableHead className="text-right">Ads</TableHead>
-            <TableHead className="text-right">Profitto</TableHead>
-            <TableHead className="text-right">Margine</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {pnl.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell className="font-mono text-sm">{row.asin}</TableCell>
-              <TableCell>{row.sku || "—"}</TableCell>
-              <TableCell className="text-right">{formatCurrency(row.revenue || 0)}</TableCell>
-              <TableCell className="text-right">{row.units_sold}</TableCell>
-              <TableCell className="text-right">{formatCurrency(row.amazon_fees || 0)}</TableCell>
-              <TableCell className="text-right">{formatCurrency(row.fba_fees || 0)}</TableCell>
-              <TableCell className="text-right">{formatCurrency(row.storage_fees || 0)}</TableCell>
-              <TableCell className="text-right">{formatCurrency(row.product_cost || 0)}</TableCell>
-              <TableCell className="text-right">{formatCurrency(row.ad_spend || 0)}</TableCell>
-              <TableCell className="text-right font-medium">
-                <span className={(row.net_profit || 0) >= 0 ? "text-green-600" : "text-red-600"}>
-                  {formatCurrency(row.net_profit || 0)}
-                </span>
-              </TableCell>
-              <TableCell className="text-right">
-                <Badge variant={(row.margin_pct || 0) >= 0 ? "default" : "destructive"}>
-                  {(row.margin_pct || 0).toFixed(1)}%
-                </Badge>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <KpiCard title="Fatturato" value={totalRevenue} format="currency" variant="blue" />
+        <KpiCard title="Fee Totali" value={totalFees} format="currency" variant="amber" />
+        <KpiCard
+          title="Profitto Netto"
+          value={totalProfit}
+          format="currency"
+          variant={totalProfit >= 0 ? "green" : "rose"}
+        />
+        <KpiCard title="Margine" value={totalMargin} format="percent" variant={totalMargin >= 0 ? "green" : "rose"} />
+      </div>
+
+      <div className="mt-6">
+        <PnlTable rows={rows} />
+      </div>
     </div>
   );
 }

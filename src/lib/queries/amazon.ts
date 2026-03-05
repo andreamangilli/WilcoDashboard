@@ -30,13 +30,71 @@ export const getAmazonKpis = unstable_cache(
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
-export const getAmazonPnl = unstable_cache(
-  async () => {
+export type AmazonPnlRow = {
+  asin: string;
+  sku: string | null;
+  revenue: number;
+  units: number;
+  amazonFees: number;
+  fbaFees: number;
+  shippingCost: number;
+  netProfit: number;
+  marginPct: number;
+};
+
+export const getAmazonPnlFromOrders = unstable_cache(
+  async (period: string, from?: string, to?: string): Promise<AmazonPnlRow[]> => {
     const supabase = await createServiceClient();
-    const { data } = await supabase.from('amazon_pnl').select('*').order('revenue', { ascending: false });
-    return data || [];
+    const { start, end } = getDateRange(period, from, to);
+
+    const { data: orders } = await supabase
+      .from('amazon_orders')
+      .select('asin, sku, quantity, item_price, amazon_fees, fba_fees, shipping_cost')
+      .gte('purchase_date', start)
+      .lte('purchase_date', end);
+
+    const byAsin = new Map<string, {
+      sku: string | null;
+      revenue: number;
+      units: number;
+      amazonFees: number;
+      fbaFees: number;
+      shippingCost: number;
+    }>();
+
+    for (const o of orders || []) {
+      if (!o.asin) continue;
+      const existing = byAsin.get(o.asin) ?? {
+        sku: o.sku, revenue: 0, units: 0, amazonFees: 0, fbaFees: 0, shippingCost: 0,
+      };
+      existing.revenue += o.item_price || 0;
+      existing.units += o.quantity || 1;
+      existing.amazonFees += Math.abs(o.amazon_fees || 0);
+      existing.fbaFees += Math.abs(o.fba_fees || 0);
+      existing.shippingCost += Math.abs(o.shipping_cost || 0);
+      byAsin.set(o.asin, existing);
+    }
+
+    return Array.from(byAsin.entries())
+      .map(([asin, agg]) => {
+        const totalCosts = agg.amazonFees + agg.fbaFees + agg.shippingCost;
+        const netProfit = agg.revenue - totalCosts;
+        const marginPct = agg.revenue > 0 ? (netProfit / agg.revenue) * 100 : 0;
+        return {
+          asin,
+          sku: agg.sku,
+          revenue: agg.revenue,
+          units: agg.units,
+          amazonFees: agg.amazonFees,
+          fbaFees: agg.fbaFees,
+          shippingCost: agg.shippingCost,
+          netProfit,
+          marginPct,
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue);
   },
-  ['amazon-pnl-v2'],
+  ['amazon-pnl-from-orders-v1'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
