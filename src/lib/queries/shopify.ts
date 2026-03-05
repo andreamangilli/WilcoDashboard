@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
+import { fetchAll } from '@/lib/supabase/fetch-all';
 import { getDateRange } from './utils';
 
 export const getShopifyStoreKpis = unstable_cache(
@@ -7,15 +8,19 @@ export const getShopifyStoreKpis = unstable_cache(
     const supabase = await createServiceClient();
     const { start, end, prevStart, prevEnd } = getDateRange(period, from, to);
 
-    const [{ data: current }, { data: prev }] = await Promise.all([
-      supabase.from('shopify_orders').select('total, subtotal, customer_email').eq('store_id', storeId).gte('created_at', start).lte('created_at', end).eq('financial_status', 'paid'),
-      supabase.from('shopify_orders').select('total').eq('store_id', storeId).gte('created_at', prevStart).lte('created_at', prevEnd).eq('financial_status', 'paid'),
+    const [current, prev] = await Promise.all([
+      fetchAll<{ total: number; subtotal: number; customer_email: string | null }>(({ from: f, to: t }) =>
+        supabase.from('shopify_orders').select('total, subtotal, customer_email').eq('store_id', storeId).gte('created_at', start).lte('created_at', end).eq('financial_status', 'paid').range(f, t)
+      ),
+      fetchAll<{ total: number }>(({ from: f, to: t }) =>
+        supabase.from('shopify_orders').select('total').eq('store_id', storeId).gte('created_at', prevStart).lte('created_at', prevEnd).eq('financial_status', 'paid').range(f, t)
+      ),
     ]);
 
-    const revenue = (current || []).reduce((s, o) => s + (o.total || 0), 0);
-    const prevRevenue = (prev || []).reduce((s, o) => s + (o.total || 0), 0);
-    const orders = current?.length || 0;
-    const prevOrders = prev?.length || 0;
+    const revenue = current.reduce((s, o) => s + (o.total || 0), 0);
+    const prevRevenue = prev.reduce((s, o) => s + (o.total || 0), 0);
+    const orders = current.length;
+    const prevOrders = prev.length;
 
     return {
       revenue: { value: revenue, change: prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0 },
@@ -23,7 +28,7 @@ export const getShopifyStoreKpis = unstable_cache(
       aov: { value: orders > 0 ? revenue / orders : 0 },
     };
   },
-  ['shopify-store-kpis-v2'],
+  ['shopify-store-kpis-v3'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -39,7 +44,7 @@ export const getShopifyAllStoresKpis = unstable_cache(
       })
     );
   },
-  ['shopify-all-stores-kpis-v2'],
+  ['shopify-all-stores-kpis-v3'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -49,7 +54,7 @@ export const getShopifyProducts = unstable_cache(
     const { data } = await supabase.from('shopify_products').select('*').eq('store_id', storeId).order('title');
     return data || [];
   },
-  ['shopify-products-v2'],
+  ['shopify-products-v3'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -59,7 +64,7 @@ export const getShopifyCustomers = unstable_cache(
     const { data } = await supabase.from('shopify_customers').select('*').eq('store_id', storeId).order('total_spent', { ascending: false });
     return data || [];
   },
-  ['shopify-customers-v2'],
+  ['shopify-customers-v3'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -69,6 +74,6 @@ export const getStoreBySlug = unstable_cache(
     const { data } = await supabase.from('stores').select('*').eq('slug', slug).single();
     return data;
   },
-  ['store-by-slug-v2'],
+  ['store-by-slug-v3'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );

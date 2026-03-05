@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { createServiceClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getDateRange } from "./utils";
 
 export type ShopifyOrderRow = {
@@ -41,13 +42,6 @@ export function mergeAndSortOrders(
 
 /**
  * Fetches unified orders across Shopify and Amazon for the given period.
- *
- * @param status - Filter by order status. For Shopify this maps to
- *   `financial_status` (e.g. "paid", "refunded"); for Amazon it maps to
- *   `order_status` (e.g. "Shipped", "Canceled"). Pass "all" to skip
- *   filtering. Note: the same value is applied to both platforms, so
- *   cross-platform status strings will not match — prefer "all" when
- *   querying across channels.
  */
 export const getUnifiedOrders = unstable_cache(
   async (
@@ -74,19 +68,24 @@ export const getUnifiedOrders = unstable_cache(
 
       const shopifyResults = await Promise.all(
         (stores || []).map(async (store) => {
-          let query = supabase
-            .from("shopify_orders")
-            .select("id, order_number, total, customer_email, financial_status, fulfillment_status, created_at, line_items")
-            .eq("store_id", store.id)
-            .gte("created_at", start)
-            .lte("created_at", end);
-          if (status !== "all") query = query.eq("financial_status", status);
-          const { data: orders, error: ordersError } = await query;
-          if (ordersError) throw new Error(`Failed to load orders for store ${store.id}: ${ordersError.message}`);
-          return (orders || []).map((o) => {
-            const rawItems = (o.line_items as Array<{
+          const orders = await fetchAll<{
+            id: string; order_number: string; total: number; customer_email: string | null;
+            financial_status: string; fulfillment_status: string | null; created_at: string;
+            line_items: Array<{ title?: string; sku?: string; quantity?: number; price?: string | number }>;
+          }>(({ from: f, to: t }) => {
+            let query = supabase
+              .from("shopify_orders")
+              .select("id, order_number, total, customer_email, financial_status, fulfillment_status, created_at, line_items")
+              .eq("store_id", store.id)
+              .gte("created_at", start)
+              .lte("created_at", end);
+            if (status !== "all") query = query.eq("financial_status", status);
+            return query.range(f, t);
+          });
+          return orders.map((o) => {
+            const rawItems = (o.line_items || []) as Array<{
               title?: string; sku?: string; quantity?: number; price?: string | number;
-            }>) || [];
+            }>;
             return {
               id: o.id,
               source: "shopify" as const,
@@ -118,16 +117,20 @@ export const getUnifiedOrders = unstable_cache(
 
       const amazonResults = await Promise.all(
         (accounts || []).map(async (account) => {
-          let query = supabase
-            .from("amazon_orders")
-            .select("id, amazon_order_id, asin, sku, item_price, order_status, fulfillment_channel, purchase_date")
-            .eq("account_id", account.id)
-            .gte("purchase_date", start)
-            .lte("purchase_date", end);
-          if (status !== "all") query = query.eq("order_status", status);
-          const { data: orders, error: ordersError } = await query;
-          if (ordersError) throw new Error(`Failed to load orders for account ${account.id}: ${ordersError.message}`);
-          return (orders || []).map((o) => ({
+          const orders = await fetchAll<{
+            id: string; amazon_order_id: string; asin: string; sku: string | null;
+            item_price: number; order_status: string; fulfillment_channel: string; purchase_date: string;
+          }>(({ from: f, to: t }) => {
+            let query = supabase
+              .from("amazon_orders")
+              .select("id, amazon_order_id, asin, sku, item_price, order_status, fulfillment_channel, purchase_date")
+              .eq("account_id", account.id)
+              .gte("purchase_date", start)
+              .lte("purchase_date", end);
+            if (status !== "all") query = query.eq("order_status", status);
+            return query.range(f, t);
+          });
+          return orders.map((o) => ({
             id: o.id,
             source: "amazon" as const,
             accountName: account.name,
@@ -146,13 +149,10 @@ export const getUnifiedOrders = unstable_cache(
 
     const all = mergeAndSortOrders(shopifyRows, amazonRows);
     const total = all.length;
-    // NOTE: In-memory pagination — fetches all orders for the period then slices.
-    // Acceptable for current data volumes. If orders per period exceed ~500,
-    // migrate to server-side pagination with Supabase .range().
     const paginated = all.slice(offset, offset + PAGE_SIZE);
 
     return { orders: paginated, total, page, pageSize: PAGE_SIZE };
   },
-  ['unified-orders-v2'],
+  ['unified-orders-v3'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );

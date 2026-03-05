@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { createServiceClient } from "@/lib/supabase/server";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getDateRange } from "./utils";
 
 export type ShopifyProductPerf = {
@@ -124,14 +125,14 @@ export const getShopifyProductPerf = unstable_cache(
 
     const perStoreResults = await Promise.all(
       (stores || []).map(async (store) => {
-        const [{ data: orders, error: ordersError }, { data: products }] = await Promise.all([
-          supabase.from('shopify_orders').select('line_items, total').eq('store_id', store.id).eq('financial_status', 'paid').gte('created_at', start).lte('created_at', end),
+        const [orders, { data: products }] = await Promise.all([
+          fetchAll<{ line_items: unknown; total: number }>(({ from: f, to: t }) =>
+            supabase.from('shopify_orders').select('line_items, total').eq('store_id', store.id).eq('financial_status', 'paid').gte('created_at', start).lte('created_at', end).range(f, t)
+          ),
           supabase.from('shopify_products').select('title, sku, inventory_qty').eq('store_id', store.id),
         ]);
 
-        if (ordersError) throw new Error(`Failed to load orders for store ${store.id}: ${ordersError.message}`);
-
-        const aggregated = aggregateLineItems(orders || [], store.name);
+        const aggregated = aggregateLineItems(orders, store.name);
 
         const inventoryByTitle = new Map((products || []).map((p) => [p.title, p.inventory_qty]));
         const inventoryBySku = new Map((products || []).filter((p) => p.sku).map((p) => [p.sku, p.inventory_qty]));
@@ -145,7 +146,7 @@ export const getShopifyProductPerf = unstable_cache(
 
     return perStoreResults.flat().sort((a, b) => b.revenue - a.revenue);
   },
-  ['shopify-product-perf-v2'],
+  ['shopify-product-perf-v3'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -154,15 +155,15 @@ export const getAmazonProductPerf = unstable_cache(
     const supabase = await createServiceClient();
     const { start, end } = getDateRange(period, from, to);
 
-    const [{ data: orders, error: ordersError }, { data: inventory }] = await Promise.all([
-      supabase.from('amazon_orders').select('asin, sku, quantity, item_price, amazon_fees, fba_fees').gte('purchase_date', start).lte('purchase_date', end),
+    const [orders, { data: inventory }] = await Promise.all([
+      fetchAll<{ asin: string; sku: string | null; quantity: number; item_price: number; amazon_fees: number; fba_fees: number }>(({ from: f, to: t }) =>
+        supabase.from('amazon_orders').select('asin, sku, quantity, item_price, amazon_fees, fba_fees').gte('purchase_date', start).lte('purchase_date', end).range(f, t)
+      ),
       supabase.from('amazon_inventory').select('asin, qty_available').eq('fulfillment', 'fba'),
     ]);
 
-    if (ordersError) throw new Error(`Failed to load amazon orders: ${ordersError.message}`);
-
     const results = aggregateAmazonProducts(
-      (orders || []).map((o) => ({
+      orders.map((o) => ({
         ...o,
         quantity: o.quantity || 1,
         item_price: o.item_price || 0,
@@ -175,6 +176,6 @@ export const getAmazonProductPerf = unstable_cache(
 
     return results.map((row) => ({ ...row, qtyAvailable: invMap.get(row.asin) ?? null }));
   },
-  ['amazon-product-perf-v2'],
+  ['amazon-product-perf-v3'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
