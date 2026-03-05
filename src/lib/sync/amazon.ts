@@ -128,6 +128,10 @@ export async function syncAmazonOrders(
               order_status: order.OrderStatus,
               fulfillment_channel: order.FulfillmentChannel,
               purchase_date: order.PurchaseDate,
+              shipping_country: order.ShippingAddress?.Country || null,
+              shipping_country_code: order.ShippingAddress?.CountryCode || null,
+              shipping_city: order.ShippingAddress?.City || null,
+              shipping_province: order.ShippingAddress?.StateOrRegion || null,
             },
             { onConflict: "amazon_order_id" }
           );
