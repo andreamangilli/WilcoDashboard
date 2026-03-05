@@ -7,11 +7,16 @@ import {
   getOverviewKpis,
   getRevenueByChannel,
   getTopProducts,
-  getOperationalSignals,
+  getOverviewKpisDaily,
+  getDailyTrend,
 } from "@/lib/queries/overview";
 import { getAdsOverview } from "@/lib/queries/ads";
+import { getSmartInsights } from "@/lib/queries/insights";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RevenueChart } from "./revenue-chart";
+import { DailyTrendChart } from "./daily-trend-chart";
+import { AdsPlatformComparison } from "./ads-platform-comparison";
+import { InsightsPanel } from "./insights-panel";
 import { formatCurrency, formatNumber } from "@/lib/format";
 
 interface Props {
@@ -21,18 +26,61 @@ interface Props {
 export default async function DashboardPage({ searchParams }: Props) {
   const { period = "30d", from, to } = await searchParams;
 
-  const [kpis, channels, adsOverview, topProducts, signals] = await Promise.all([
-    getOverviewKpis(period, from, to),
-    getRevenueByChannel(period, from, to),
-    getAdsOverview(period, from, to),
-    getTopProducts(period, from, to),
-    getOperationalSignals(),
-  ]);
+  const [kpis, channels, adsOverview, topProducts, kpisDaily, trend, insights] =
+    await Promise.all([
+      getOverviewKpis(period, from, to),
+      getRevenueByChannel(period, from, to),
+      getAdsOverview(period, from, to),
+      getTopProducts(period, from, to),
+      getOverviewKpisDaily(),
+      getDailyTrend(period, from, to),
+      getSmartInsights(period, from, to),
+    ]);
 
   const totalOrders = kpis.orders.value;
-  const aov = totalOrders > 0 ? kpis.revenue.value / totalOrders : 0;
+  const revenue = kpis.revenue.value;
+  const aov = totalOrders > 0 ? revenue / totalOrders : 0;
+  const prevAov =
+    kpis.orders.change !== 0 || kpis.revenue.change !== 0
+      ? (() => {
+          const prevRev = kpis.revenue.change !== 0
+            ? revenue / (1 + kpis.revenue.change / 100)
+            : revenue;
+          const prevOrd = kpis.orders.change !== 0
+            ? totalOrders / (1 + kpis.orders.change / 100)
+            : totalOrders;
+          return prevOrd > 0 ? prevRev / prevOrd : 0;
+        })()
+      : 0;
+  const aovChange = prevAov > 0 ? ((aov - prevAov) / prevAov) * 100 : 0;
+
   const totalAdSpend = adsOverview.total.spend;
   const totalAdRoas = adsOverview.total.roas;
+  const prevAdRoas = kpis.adSpend.change !== 0
+    ? (() => {
+        const prevSpend = totalAdSpend / (1 + kpis.adSpend.change / 100);
+        const prevAdsRev = adsOverview.total.revenue * (prevSpend / totalAdSpend);
+        return prevSpend > 0 ? prevAdsRev / prevSpend : 0;
+      })()
+    : totalAdRoas;
+  const roasChange = prevAdRoas > 0 ? ((totalAdRoas - prevAdRoas) / prevAdRoas) * 100 : 0;
+
+  const marginNet = revenue - totalAdSpend;
+  const prevMarginNet =
+    revenue / (1 + (kpis.revenue.change || 0) / 100) -
+    totalAdSpend / (1 + (kpis.adSpend.change || 0) / 100);
+  const marginChange = prevMarginNet !== 0 ? ((marginNet - prevMarginNet) / Math.abs(prevMarginNet)) * 100 : 0;
+
+  const newCustomers = kpisDaily.reduce((s, d) => s + d.newCustomers, 0);
+
+  // Sparkline data arrays (7 days)
+  const sparkRevenue = kpisDaily.map((d) => d.revenue);
+  const sparkOrders = kpisDaily.map((d) => d.orders);
+  const sparkAov = kpisDaily.map((d) => (d.orders > 0 ? d.revenue / d.orders : 0));
+  const sparkAdSpend = kpisDaily.map((d) => d.adSpend);
+  const sparkRoas = kpisDaily.map((d) => (d.adSpend > 0 ? d.adsRevenue / d.adSpend : 0));
+  const sparkMargin = kpisDaily.map((d) => d.revenue - d.adSpend);
+  const sparkNewCust = kpisDaily.map((d) => d.newCustomers);
 
   return (
     <div>
@@ -40,45 +88,79 @@ export default async function DashboardPage({ searchParams }: Props) {
         <DateRangePicker />
       </PageHeader>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      {/* KPI Cards — 7 columns */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         <KpiCard
           title="Fatturato Totale"
-          value={kpis.revenue.value}
+          value={revenue}
           format="currency"
           change={kpis.revenue.change}
           variant="green"
+          sparklineData={sparkRevenue}
         />
         <KpiCard
           title="Ordini Totali"
-          value={kpis.orders.value}
+          value={totalOrders}
           format="number"
           change={kpis.orders.change}
           variant="blue"
+          sparklineData={sparkOrders}
         />
         <KpiCard
           title="AOV"
           value={aov}
           format="currency"
+          change={aovChange}
           variant="violet"
+          sparklineData={sparkAov}
         />
         <KpiCard
           title="Spesa Ads"
-          value={kpis.adSpend.value}
+          value={totalAdSpend}
           format="currency"
           change={kpis.adSpend.change}
           variant="amber"
+          sparklineData={sparkAdSpend}
         />
         <KpiCard
-          title="ROAS Complessivo"
+          title="ROAS"
           value={totalAdRoas}
-          format="number"
+          format="decimal"
+          change={roasChange}
           variant="rose"
+          sparklineData={sparkRoas}
+        />
+        <KpiCard
+          title="Margine Netto"
+          value={marginNet}
+          format="currency"
+          change={marginChange}
+          variant="teal"
+          sparklineData={sparkMargin}
+        />
+        <KpiCard
+          title="Nuovi Clienti"
+          value={newCustomers}
+          format="number"
+          variant="cyan"
+          sparklineData={sparkNewCust}
         />
       </div>
 
-      {/* Revenue chart + Operational Signals */}
-      <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {/* Daily Trend Chart */}
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Andamento Giornaliero</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DailyTrendChart current={trend.current} previous={trend.previous} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Revenue by Channel + Ads Platform Comparison */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Fatturato per Canale</CardTitle>
@@ -90,46 +172,22 @@ export default async function DashboardPage({ searchParams }: Props) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Segnali Operativi</CardTitle>
+            <CardTitle>Google vs Meta Ads</CardTitle>
           </CardHeader>
           <CardContent>
-            {signals.lowStockSkus.length === 0 && signals.lowRoasCampaigns.length === 0 ? (
-              <p className="text-sm text-green-600">Nessun segnale critico</p>
-            ) : (
-              <div className="space-y-3">
-                {signals.lowStockSkus.length > 0 && (
-                  <div>
-                    <p className="mb-1 text-xs font-semibold uppercase text-red-600">
-                      ⚠ Stock Basso
-                    </p>
-                    <ul className="space-y-1">
-                      {signals.lowStockSkus.slice(0, 5).map((s) => (
-                        <li key={`${s.channel}-${s.name}`} className="text-sm text-gray-700">
-                          {s.name}{" "}
-                          <span className="text-red-600 font-medium">
-                            ({s.qty} pz — {s.channel})
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {signals.lowRoasCampaigns.length > 0 && (
-                  <div>
-                    <p className="mb-1 text-xs font-semibold uppercase text-orange-600">
-                      📉 ROAS Basso (7gg)
-                    </p>
-                    <ul className="space-y-1">
-                      {signals.lowRoasCampaigns.slice(0, 3).map((c) => (
-                        <li key={c.name} className="text-sm text-gray-700">
-                          {c.name}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
+            <AdsPlatformComparison google={adsOverview.google} meta={adsOverview.meta} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Smart Insights */}
+      <div className="mt-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Insight & Segnali</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <InsightsPanel insights={insights} />
           </CardContent>
         </Card>
       </div>
