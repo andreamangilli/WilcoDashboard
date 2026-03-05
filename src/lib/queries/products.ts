@@ -146,7 +146,7 @@ export const getShopifyProductPerf = unstable_cache(
 
     return perStoreResults.flat().sort((a, b) => b.revenue - a.revenue);
   },
-  ['shopify-product-perf-v3'],
+  ['shopify-product-perf-v4'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -176,6 +176,6 @@ export const getAmazonProductPerf = unstable_cache(
 
     return results.map((row) => ({ ...row, qtyAvailable: invMap.get(row.asin) ?? null }));
   },
-  ['amazon-product-perf-v3'],
+  ['amazon-product-perf-v4'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );

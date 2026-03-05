@@ -62,7 +62,7 @@ export const getAdsOverview = unstable_cache(
       },
     };
   },
-  ['ads-overview-v2'],
+  ['ads-overview-v4'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -108,7 +108,7 @@ export const getAdsCampaignsWithMetrics = unstable_cache(
       };
     });
   },
-  ['ads-campaigns-v2'],
+  ['ads-campaigns-v4'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
@@ -142,7 +142,7 @@ export const getAdsDailySpend = unstable_cache(
 
     return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
   },
-  ['ads-daily-spend-v2'],
+  ['ads-daily-spend-v4'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
 
