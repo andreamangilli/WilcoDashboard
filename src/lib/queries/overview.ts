@@ -191,3 +191,100 @@ export const getOperationalSignals = unstable_cache(
   ['operational-signals-v4'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
+
+export type DailyKpiPoint = {
+  date: string;
+  revenue: number;
+  orders: number;
+  adSpend: number;
+  adsRevenue: number;
+  newCustomers: number;
+};
+
+export const getOverviewKpisDaily = unstable_cache(
+  async (): Promise<DailyKpiPoint[]> => {
+    const supabase = await createServiceClient();
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 6); // 7 days including today
+
+    const startISO = start.toISOString().split('T')[0];
+    const endISO = end.toISOString().split('T')[0];
+    const startFull = `${startISO}T00:00:00Z`;
+    const endFull = `${endISO}T23:59:59Z`;
+
+    const [shopifyOrders, amazonOrders, adSpend, newCustomers] = await Promise.all([
+      fetchAll<{ total: number; created_at: string }>(({ from: f, to: t }) =>
+        supabase
+          .from('shopify_orders')
+          .select('total, created_at')
+          .gte('created_at', startFull)
+          .lte('created_at', endFull)
+          .eq('financial_status', 'paid')
+          .range(f, t)
+      ),
+      fetchAll<{ item_price: number; purchase_date: string }>(({ from: f, to: t }) =>
+        supabase
+          .from('amazon_orders')
+          .select('item_price, purchase_date')
+          .gte('purchase_date', startFull)
+          .lte('purchase_date', endFull)
+          .range(f, t)
+      ),
+      fetchAll<{ date: string; spend: number; revenue: number }>(({ from: f, to: t }) =>
+        supabase
+          .from('ad_spend_daily')
+          .select('date, spend, revenue')
+          .gte('date', startISO)
+          .lte('date', endISO)
+          .range(f, t)
+      ),
+      fetchAll<{ first_order_at: string }>(({ from: f, to: t }) =>
+        supabase
+          .from('shopify_customers')
+          .select('first_order_at')
+          .gte('first_order_at', startFull)
+          .lte('first_order_at', endFull)
+          .range(f, t)
+      ),
+    ]);
+
+    // Build a map for each day
+    const days: Record<string, DailyKpiPoint> = {};
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const key = d.toISOString().split('T')[0];
+      days[key] = { date: key, revenue: 0, orders: 0, adSpend: 0, adsRevenue: 0, newCustomers: 0 };
+    }
+
+    for (const o of shopifyOrders) {
+      const key = o.created_at.split('T')[0];
+      if (days[key]) {
+        days[key].revenue += o.total || 0;
+        days[key].orders += 1;
+      }
+    }
+    for (const o of amazonOrders) {
+      const key = o.purchase_date.split('T')[0];
+      if (days[key]) {
+        days[key].revenue += o.item_price || 0;
+        days[key].orders += 1;
+      }
+    }
+    for (const a of adSpend) {
+      if (days[a.date]) {
+        days[a.date].adSpend += a.spend || 0;
+        days[a.date].adsRevenue += a.revenue || 0;
+      }
+    }
+    for (const c of newCustomers) {
+      const key = c.first_order_at?.split('T')[0];
+      if (key && days[key]) {
+        days[key].newCustomers += 1;
+      }
+    }
+
+    return Object.values(days).sort((a, b) => a.date.localeCompare(b.date));
+  },
+  ['overview-kpis-daily-v1'],
+  { revalidate: 1800, tags: ['dashboard-data'] }
+);
