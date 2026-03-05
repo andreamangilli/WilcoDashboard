@@ -145,6 +145,7 @@ export default async function OrdiniPage({ searchParams }: Props) {
               <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">N° Ordine</TableHead>
               <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Canale</TableHead>
               <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Cliente</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Destinazione</TableHead>
               <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Prodotti</TableHead>
               <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Totale</TableHead>
               <TableHead className="text-xs font-semibold uppercase tracking-wider text-gray-500">Stato</TableHead>
@@ -154,7 +155,7 @@ export default async function OrdiniPage({ searchParams }: Props) {
             {orders.length === 0 ? (
               <TableRow>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="py-12 text-center text-sm text-gray-400"
                 >
                   Nessun ordine trovato per il periodo selezionato.

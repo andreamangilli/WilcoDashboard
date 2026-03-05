@@ -74,6 +74,11 @@ export function OrderRow({ order }: { order: UnifiedOrder }) {
         <TableCell className="text-sm text-gray-500">
           {order.source === "shopify" ? order.customerEmail ?? "—" : "—"}
         </TableCell>
+        <TableCell className="text-sm text-gray-500">
+          {order.shippingCity && order.shippingCountryCode
+            ? `${order.shippingCity}, ${order.shippingCountryCode}`
+            : order.shippingCountryCode ?? "—"}
+        </TableCell>
         <TableCell className="text-sm">
           {itemCount} {itemCount === 1 ? "articolo" : "articoli"}
         </TableCell>
@@ -87,7 +92,7 @@ export function OrderRow({ order }: { order: UnifiedOrder }) {
 
       {expanded && (
         <TableRow className="bg-gray-50">
-          <TableCell colSpan={8} className="py-0">
+          <TableCell colSpan={9} className="py-0">
             <div className="pl-8 py-3">
               {order.source === "shopify" ? (
                 <table className="w-full text-sm">
