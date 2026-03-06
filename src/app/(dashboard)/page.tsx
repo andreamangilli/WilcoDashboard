@@ -12,11 +12,21 @@ import {
 } from "@/lib/queries/overview";
 import { getAdsOverview } from "@/lib/queries/ads";
 import { getSmartInsights } from "@/lib/queries/insights";
+import {
+  getCampaignMatrix,
+  getParetoAnalysis,
+  getCustomerHealth,
+  getStrategicRecommendations,
+} from "@/lib/queries/strategic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RevenueChart } from "./revenue-chart";
 import { DailyTrendChart } from "./daily-trend-chart";
 import { AdsPlatformComparison } from "./ads-platform-comparison";
 import { InsightsPanel } from "./insights-panel";
+import { CampaignMatrix } from "./campaign-matrix";
+import { ParetoChart } from "./pareto-chart";
+import { CustomerHealthPanel } from "./customer-health-panel";
+import { StrategicAdvisor } from "./strategic-advisor";
 import { formatCurrency, formatNumber } from "@/lib/format";
 
 interface Props {
@@ -26,7 +36,7 @@ interface Props {
 export default async function DashboardPage({ searchParams }: Props) {
   const { period = "30d", from, to } = await searchParams;
 
-  const [kpis, channels, adsOverview, topProducts, kpisDaily, trend, insights] =
+  const [kpis, channels, adsOverview, topProducts, kpisDaily, trend, insights, campaignMatrix, pareto, customerHealth, strategicRecs] =
     await Promise.all([
       getOverviewKpis(period, from, to),
       getRevenueByChannel(period, from, to),
@@ -35,6 +45,10 @@ export default async function DashboardPage({ searchParams }: Props) {
       getOverviewKpisDaily(),
       getDailyTrend(period, from, to),
       getSmartInsights(period, from, to),
+      getCampaignMatrix(period, from, to),
+      getParetoAnalysis(period, from, to),
+      getCustomerHealth(period, from, to),
+      getStrategicRecommendations(period, from, to),
     ]);
 
   const totalOrders = kpis.orders.value;
@@ -225,6 +239,54 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </tbody>
               </table>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Campaign Matrix + Customer Health */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <Card className="lg:col-span-7">
+          <CardHeader>
+            <CardTitle>Matrice Campagne</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CampaignMatrix
+              data={campaignMatrix}
+              medianSpend={campaignMatrix.length > 0
+                ? [...campaignMatrix].sort((a, b) => a.total_spend - b.total_spend)[Math.floor(campaignMatrix.length / 2)].total_spend
+                : 0
+              }
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-5">
+          <CardHeader>
+            <CardTitle>Salute Clienti</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CustomerHealthPanel data={customerHealth} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Pareto Analysis + Strategic Advisor */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <Card className="lg:col-span-5">
+          <CardHeader>
+            <CardTitle>Analisi Pareto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ParetoChart data={pareto} />
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-7">
+          <CardHeader>
+            <CardTitle>Consigliere Strategico</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StrategicAdvisor recommendations={strategicRecs} />
           </CardContent>
         </Card>
       </div>
