@@ -284,13 +284,9 @@ export const getParetoAnalysis = unstable_cache(
     const supabase = await createServiceClient();
     const { start, end } = getDateRange(period, from, to);
 
-    // Product revenue from Shopify + Amazon
-    const [shopifyOrders, amazonOrders] = await Promise.all([
-      fetchAll<{ title: string; total: number }>(({ from: f, to: t }) =>
-        supabase.from('shopify_orders').select('title, total')
-          .gte('created_at', start).lte('created_at', end)
-          .eq('financial_status', 'paid').range(f, t)
-      ),
+    // Product revenue: use RPC for Shopify (extracts from line_items JSONB), raw query for Amazon
+    const [{ data: shopifyTop }, amazonOrders] = await Promise.all([
+      supabase.rpc('get_top_products', { p_start: start, p_end: end, p_limit: 100 }),
       fetchAll<{ asin: string; sku: string; item_price: number }>(({ from: f, to: t }) =>
         supabase.from('amazon_orders').select('asin, sku, item_price')
           .gte('purchase_date', start).lte('purchase_date', end).range(f, t)
@@ -299,9 +295,8 @@ export const getParetoAnalysis = unstable_cache(
 
     // Aggregate by product
     const productMap = new Map<string, number>();
-    for (const o of shopifyOrders) {
-      const name = o.title || 'Sconosciuto';
-      productMap.set(name, (productMap.get(name) || 0) + (o.total || 0));
+    for (const r of (shopifyTop || []) as { title: string; units: number; revenue: number; store_name: string }[]) {
+      productMap.set(r.title, (productMap.get(r.title) || 0) + Number(r.revenue || 0));
     }
     for (const o of amazonOrders) {
       const name = o.sku || o.asin || 'Amazon SKU';
@@ -367,11 +362,11 @@ export const getCustomerHealth = unstable_cache(
     const { start, end, prevStart, prevEnd } = getDateRange(period, from, to);
 
     const [allCustomers, currentOrders, prevOrders] = await Promise.all([
-      fetchAll<{ id: string; orders_count: number; total_spent: number; first_order_at: string }>(({ from: f, to: t }) =>
-        supabase.from('shopify_customers').select('id, orders_count, total_spent, first_order_at').range(f, t)
+      fetchAll<{ id: string; email: string; orders_count: number; total_spent: number; first_order_at: string }>(({ from: f, to: t }) =>
+        supabase.from('shopify_customers').select('id, email, orders_count, total_spent, first_order_at').range(f, t)
       ),
-      fetchAll<{ total: number; customer_id: string }>(({ from: f, to: t }) =>
-        supabase.from('shopify_orders').select('total, customer_id')
+      fetchAll<{ total: number; customer_email: string }>(({ from: f, to: t }) =>
+        supabase.from('shopify_orders').select('total, customer_email')
           .gte('created_at', start).lte('created_at', end)
           .eq('financial_status', 'paid').range(f, t)
       ),
@@ -399,8 +394,8 @@ export const getCustomerHealth = unstable_cache(
     }).length;
 
     // Returning orders (customers with orders_count > 1 placing orders in period)
-    const repeatCustomerIds = new Set(allCustomers.filter((c) => (c.orders_count || 0) > 1).map((c) => c.id));
-    const returningOrdersPeriod = currentOrders.filter((o) => repeatCustomerIds.has(o.customer_id)).length;
+    const repeatEmails = new Set(allCustomers.filter((c) => (c.orders_count || 0) > 1).map((c) => c.email));
+    const returningOrdersPeriod = currentOrders.filter((o) => o.customer_email && repeatEmails.has(o.customer_email)).length;
 
     // AOV
     const currentRevenue = currentOrders.reduce((s, o) => s + (o.total || 0), 0);
