@@ -1,4 +1,4 @@
-import { formatCurrency, formatNumber, formatPercent } from "../format";
+import { formatCurrency, formatPercent } from "../format";
 
 describe("formatCurrency", () => {
   it("formats EUR currency in Italian locale", () => {

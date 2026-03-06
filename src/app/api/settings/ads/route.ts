@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const supabase = await createClient();
   const body = await request.json();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructure platform out of creds
   const { id, platform, account_id, account_name, ...creds } = body;
 
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });

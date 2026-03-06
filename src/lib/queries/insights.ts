@@ -158,6 +158,7 @@ export function calculateInsights(input: InsightInput): Insight[] {
 // ── Cached query ───────────────────────────────────────────────
 
 export const getSmartInsights = unstable_cache(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- params used as unstable_cache keys
   async (_period: string, _from?: string, _to?: string): Promise<Insight[]> => {
     const supabase = await createServiceClient();
 

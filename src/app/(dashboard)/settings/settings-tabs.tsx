@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -217,17 +217,23 @@ function ShopifyTab() {
   const [domain, setDomain] = useState("");
   const [accessToken, setAccessToken] = useState("");
 
-  const fetchStores = useCallback(async () => {
-    setLoading(true);
+  async function refreshStores() {
     try {
       const res = await fetch("/api/settings/stores");
       const data = await res.json();
       setStores(Array.isArray(data) ? data : []);
     } catch { /* ignore */ }
-    setLoading(false);
-  }, []);
+  }
 
-  useEffect(() => { fetchStores(); }, [fetchStores]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings/stores")
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setStores(Array.isArray(data) ? data : []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   function openCreate() {
     setEditing(null);
@@ -269,7 +275,7 @@ function ShopifyTab() {
         });
       }
       setDialogOpen(false);
-      await fetchStores();
+      await refreshStores();
     } catch { /* ignore */ }
     setSaving(false);
   }
@@ -281,7 +287,7 @@ function ShopifyTab() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: store.id }),
     });
-    await fetchStores();
+    await refreshStores();
   }
 
   // Auto-generate slug from name
@@ -397,17 +403,23 @@ function AmazonTab() {
   const [clientSecret, setClientSecret] = useState("");
   const [refreshToken, setRefreshToken] = useState("");
 
-  const fetchAccounts = useCallback(async () => {
-    setLoading(true);
+  async function refreshAccounts() {
     try {
       const res = await fetch("/api/settings/amazon");
       const data = await res.json();
       setAccounts(Array.isArray(data) ? data : []);
     } catch { /* ignore */ }
-    setLoading(false);
-  }, []);
+  }
 
-  useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings/amazon")
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setAccounts(Array.isArray(data) ? data : []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   function openCreate() {
     setEditing(null);
@@ -466,7 +478,7 @@ function AmazonTab() {
         });
       }
       setDialogOpen(false);
-      await fetchAccounts();
+      await refreshAccounts();
     } catch { /* ignore */ }
     setSaving(false);
   }
@@ -478,7 +490,7 @@ function AmazonTab() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: account.id }),
     });
-    await fetchAccounts();
+    await refreshAccounts();
   }
 
   if (loading) return <LoadingState />;
@@ -605,8 +617,7 @@ function GoogleAdsTab() {
   const [refreshToken, setRefreshToken] = useState("");
   const [managerId, setManagerId] = useState("");
 
-  const fetchAccounts = useCallback(async () => {
-    setLoading(true);
+  async function refreshAccounts() {
     try {
       const res = await fetch("/api/settings/ads");
       const data = await res.json();
@@ -615,10 +626,24 @@ function GoogleAdsTab() {
       );
       setAccounts(filtered);
     } catch { /* ignore */ }
-    setLoading(false);
-  }, []);
+  }
 
-  useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings/ads")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) {
+          const filtered = (Array.isArray(data) ? data : []).filter(
+            (a: AdAccount) => a.platform === "google"
+          );
+          setAccounts(filtered);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   function openCreate() {
     setEditing(null);
@@ -683,7 +708,7 @@ function GoogleAdsTab() {
         });
       }
       setDialogOpen(false);
-      await fetchAccounts();
+      await refreshAccounts();
     } catch { /* ignore */ }
     setSaving(false);
   }
@@ -695,7 +720,7 @@ function GoogleAdsTab() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: account.id }),
     });
-    await fetchAccounts();
+    await refreshAccounts();
   }
 
   if (loading) return <LoadingState />;
@@ -836,8 +861,7 @@ function MetaAdsTab() {
   const [accountId, setAccountId] = useState("");
   const [accessToken, setAccessToken] = useState("");
 
-  const fetchAccounts = useCallback(async () => {
-    setLoading(true);
+  async function refreshAccounts() {
     try {
       const res = await fetch("/api/settings/ads");
       const data = await res.json();
@@ -846,10 +870,24 @@ function MetaAdsTab() {
       );
       setAccounts(filtered);
     } catch { /* ignore */ }
-    setLoading(false);
-  }, []);
+  }
 
-  useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings/ads")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) {
+          const filtered = (Array.isArray(data) ? data : []).filter(
+            (a: AdAccount) => a.platform === "meta"
+          );
+          setAccounts(filtered);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   function openCreate() {
     setEditing(null);
@@ -895,7 +933,7 @@ function MetaAdsTab() {
         });
       }
       setDialogOpen(false);
-      await fetchAccounts();
+      await refreshAccounts();
     } catch { /* ignore */ }
     setSaving(false);
   }
@@ -907,7 +945,7 @@ function MetaAdsTab() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: account.id }),
     });
-    await fetchAccounts();
+    await refreshAccounts();
   }
 
   if (loading) return <LoadingState />;
