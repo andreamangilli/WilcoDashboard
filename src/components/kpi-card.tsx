@@ -78,7 +78,7 @@ export function KpiCard({ title, value, format, change, variant = "blue", sparkl
           )}
           <span>
             {change >= 0 ? "+" : ""}
-            {formatPercent(change)} vs periodo prec.
+            {formatPercent(change)} vs anno prec.
           </span>
         </div>
       )}

@@ -40,14 +40,14 @@ export function calculateInsights(input: InsightInput): Insight[] {
       insights.push({
         type: 'anomaly_negative',
         severity: 'high',
-        message: `Fatturato ${store.name} ${(delta * 100).toFixed(0)}% rispetto al periodo precedente`,
+        message: `Fatturato ${store.name} ${(delta * 100).toFixed(0)}% rispetto allo stesso periodo dell'anno scorso`,
         delta: delta * 100,
       });
     } else if (delta > ANOMALY_THRESHOLD) {
       insights.push({
         type: 'anomaly_positive',
         severity: 'medium',
-        message: `Fatturato ${store.name} +${(delta * 100).toFixed(0)}% rispetto al periodo precedente`,
+        message: `Fatturato ${store.name} +${(delta * 100).toFixed(0)}% rispetto allo stesso periodo dell'anno scorso`,
         delta: delta * 100,
       });
     }
@@ -60,14 +60,14 @@ export function calculateInsights(input: InsightInput): Insight[] {
       insights.push({
         type: 'anomaly_negative',
         severity: 'high',
-        message: `Fatturato Amazon ${(delta * 100).toFixed(0)}% rispetto al periodo precedente`,
+        message: `Fatturato Amazon ${(delta * 100).toFixed(0)}% rispetto allo stesso periodo dell'anno scorso`,
         delta: delta * 100,
       });
     } else if (delta > ANOMALY_THRESHOLD) {
       insights.push({
         type: 'anomaly_positive',
         severity: 'medium',
-        message: `Fatturato Amazon +${(delta * 100).toFixed(0)}% rispetto al periodo precedente`,
+        message: `Fatturato Amazon +${(delta * 100).toFixed(0)}% rispetto allo stesso periodo dell'anno scorso`,
         delta: delta * 100,
       });
     }

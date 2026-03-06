@@ -1,16 +1,15 @@
-import { subDays, startOfDay, endOfDay } from "date-fns";
+import { subDays, subYears, startOfDay, endOfDay } from "date-fns";
 
 export function getDateRange(period: string, from?: string, to?: string) {
   // Custom date range takes precedence
   if (from && to) {
     const start = startOfDay(new Date(from));
     const end = endOfDay(new Date(to));
-    const diff = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000));
     return {
       start: start.toISOString(),
       end: end.toISOString(),
-      prevStart: startOfDay(subDays(start, diff)).toISOString(),
-      prevEnd: start.toISOString(),
+      prevStart: startOfDay(subYears(start, 1)).toISOString(),
+      prevEnd: endOfDay(subYears(end, 1)).toISOString(),
     };
   }
 
@@ -38,12 +37,11 @@ export function getDateRange(period: string, from?: string, to?: string) {
       start = startOfDay(subDays(now, 30));
   }
 
+  // Year-over-year: compare with the same period last year
   return {
     start: start.toISOString(),
     end: endOfDay(now).toISOString(),
-    prevStart: startOfDay(
-      subDays(start, Math.ceil((now.getTime() - start.getTime()) / 86400000))
-    ).toISOString(),
-    prevEnd: start.toISOString(),
+    prevStart: startOfDay(subYears(start, 1)).toISOString(),
+    prevEnd: endOfDay(subYears(now, 1)).toISOString(),
   };
 }
