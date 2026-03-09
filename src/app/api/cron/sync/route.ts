@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     ? `https://${process.env.VERCEL_URL}`
     : "http://localhost:3000";
 
-  const sources = ["shopify", "amazon", "google", "meta"];
+  const sources = ["shopify", "amazon", "google", "meta", "klaviyo"];
   const results: Record<string, unknown> = {};
 
   for (const source of sources) {

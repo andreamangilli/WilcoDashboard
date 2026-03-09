@@ -28,6 +28,7 @@ import { ParetoChart } from "./pareto-chart";
 import { CustomerHealthPanel } from "./customer-health-panel";
 import { StrategicAdvisor } from "./strategic-advisor";
 import { formatCurrency, formatNumber } from "@/lib/format";
+import { SyncButton } from "@/components/sync-button";
 
 interface Props {
   searchParams: Promise<{ period?: string; from?: string; to?: string }>;
@@ -99,7 +100,10 @@ export default async function DashboardPage({ searchParams }: Props) {
   return (
     <div>
       <PageHeader title="Dashboard" description="Panoramica Gruppo Wilco">
-        <DateRangePicker />
+        <div className="flex items-center gap-2">
+          <SyncButton />
+          <DateRangePicker />
+        </div>
       </PageHeader>
 
       {/* KPI Cards — 7 columns */}

@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/page-header";
-import { SyncButton } from "./sync-button";
+import { SyncButton } from "@/components/sync-button";
 import { SettingsTabs } from "./settings-tabs";
 
 export default function SettingsPage() {
