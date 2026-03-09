@@ -177,11 +177,72 @@ export const getCampaignInfo = unstable_cache(
     const supabase = await createServiceClient();
     const { data } = await supabase
       .from('ad_campaigns')
-      .select('id, ad_account_id, campaign_id, campaign_name, status, daily_budget')
+      .select('id, ad_account_id, campaign_id, campaign_name, status, daily_budget, campaign_type, bidding_strategy')
       .eq('campaign_id', campaignId)
       .single();
     return data;
   },
-  ['campaign-info-v1'],
+  ['campaign-info-v2'],
+  { revalidate: 1800, tags: ['dashboard-data'] }
+);
+
+export type AdGroupWithMetrics = {
+  ad_group_id: string;
+  ad_group_name: string;
+  ad_group_status: string;
+  spend: number;
+  revenue: number;
+  roas: number;
+  cpc: number;
+  clicks: number;
+  impressions: number;
+  conversions: number;
+};
+
+export const getCampaignAdGroups = unstable_cache(
+  async (campaignId: string, period: string, from?: string, to?: string): Promise<AdGroupWithMetrics[]> => {
+    const supabase = await createServiceClient();
+    const { start, end } = getDateRange(period, from, to);
+    const startDate = start.split('T')[0];
+    const endDate = end.split('T')[0];
+
+    const { data } = await supabase
+      .from('ad_group_daily')
+      .select('ad_group_id, ad_group_name, ad_group_status, spend, impressions, clicks, conversions, revenue')
+      .eq('campaign_id', campaignId)
+      .gte('date', startDate)
+      .lte('date', endDate);
+
+    const byGroup = new Map<string, { name: string; status: string; spend: number; revenue: number; clicks: number; impressions: number; conversions: number }>();
+    for (const row of data || []) {
+      const existing = byGroup.get(row.ad_group_id) ?? {
+        name: row.ad_group_name || '',
+        status: row.ad_group_status || '',
+        spend: 0, revenue: 0, clicks: 0, impressions: 0, conversions: 0,
+      };
+      existing.spend += row.spend || 0;
+      existing.revenue += row.revenue || 0;
+      existing.clicks += row.clicks || 0;
+      existing.impressions += row.impressions || 0;
+      existing.conversions += row.conversions || 0;
+      if (row.ad_group_name) existing.name = row.ad_group_name;
+      if (row.ad_group_status) existing.status = row.ad_group_status;
+      byGroup.set(row.ad_group_id, existing);
+    }
+
+    return Array.from(byGroup.entries()).map(([id, m]) => ({
+      ad_group_id: id,
+      ad_group_name: m.name,
+      ad_group_status: m.status,
+      spend: m.spend,
+      revenue: m.revenue,
+      roas: m.spend > 0 ? m.revenue / m.spend : 0,
+      cpc: m.clicks > 0 ? m.spend / m.clicks : 0,
+      clicks: m.clicks,
+      impressions: m.impressions,
+      conversions: m.conversions,
+    })).sort((a, b) => b.spend - a.spend);
+  },
+  ['campaign-ad-groups-v1'],
   { revalidate: 1800, tags: ['dashboard-data'] }
 );
