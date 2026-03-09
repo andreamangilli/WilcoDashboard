@@ -156,5 +156,44 @@ export async function syncGoogleAds(
     );
   }
 
+  // 4. Asset groups (Performance Max)
+  try {
+    const assetGroupRows = await customer.query(`
+      SELECT
+        campaign.id,
+        asset_group.id, asset_group.name, asset_group.status,
+        metrics.cost_micros, metrics.impressions, metrics.clicks,
+        metrics.conversions, metrics.conversions_value,
+        segments.date
+      FROM asset_group
+      WHERE segments.date BETWEEN '${formatDate(since)}' AND '${formatDate(today)}'
+      ORDER BY segments.date DESC
+    `);
+
+    for (const row of assetGroupRows) {
+      const spend = (row.metrics!.cost_micros || 0) / 1_000_000;
+      const revenue = row.metrics!.conversions_value || 0;
+
+      await supabase.from("ad_group_daily").upsert(
+        {
+          ad_account_id: adAccountId,
+          campaign_id: String(row.campaign!.id),
+          ad_group_id: "ag_" + String(row.asset_group!.id),
+          ad_group_name: row.asset_group!.name,
+          ad_group_status: statusLabel(row.asset_group!.status as number),
+          date: row.segments!.date,
+          spend,
+          impressions: row.metrics!.impressions || 0,
+          clicks: row.metrics!.clicks || 0,
+          conversions: row.metrics!.conversions || 0,
+          revenue,
+        },
+        { onConflict: "ad_account_id,campaign_id,ad_group_id,date" }
+      );
+    }
+  } catch {
+    // asset_group query may fail for non-PMax accounts
+  }
+
   return synced;
 }

@@ -220,6 +220,54 @@ async function main() {
       }
       console.log(`  ${agSynced} righe gruppi di annunci`);
 
+      // --- 4. Asset groups (Performance Max) ---
+      console.log("  [4/4] Sync asset groups (PMax)...");
+      try {
+        const assetGroupRows = await customer.query(`
+          SELECT
+            campaign.id,
+            asset_group.id,
+            asset_group.name,
+            asset_group.status,
+            metrics.cost_micros,
+            metrics.impressions,
+            metrics.clicks,
+            metrics.conversions,
+            metrics.conversions_value,
+            segments.date
+          FROM asset_group
+          WHERE segments.date BETWEEN '${formatDate(since)}' AND '${formatDate(today)}'
+          ORDER BY segments.date DESC
+        `);
+
+        let agSynced2 = 0;
+        for (const row of assetGroupRows) {
+          const spend = (row.metrics.cost_micros || 0) / 1_000_000;
+          const revenue = row.metrics.conversions_value || 0;
+
+          await supabase.from("ad_group_daily").upsert(
+            {
+              ad_account_id: account.id,
+              campaign_id: String(row.campaign.id),
+              ad_group_id: "ag_" + String(row.asset_group.id),
+              ad_group_name: row.asset_group.name,
+              ad_group_status: campaignStatusLabel(row.asset_group.status),
+              date: row.segments.date,
+              spend,
+              impressions: row.metrics.impressions || 0,
+              clicks: row.metrics.clicks || 0,
+              conversions: row.metrics.conversions || 0,
+              revenue,
+            },
+            { onConflict: "ad_account_id,campaign_id,ad_group_id,date" }
+          );
+          agSynced2++;
+        }
+        console.log(`  ${agSynced2} righe asset groups`);
+      } catch (err) {
+        console.log(`  Asset groups skip: ${err.message}`);
+      }
+
       // --- Riepilogo ---
       const { data: totals } = await supabase
         .from("ad_spend_daily")
