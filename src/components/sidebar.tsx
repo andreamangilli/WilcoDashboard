@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   Package,
   Megaphone,
+  Mail,
   Settings,
   ClipboardList,
   BarChart2,
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/shopify", label: "Shopify", icon: ShoppingBag },
   { href: "/amazon", label: "Amazon", icon: Package },
   { href: "/ads", label: "Advertising", icon: Megaphone },
+  { href: "/klaviyo", label: "Klaviyo", icon: Mail },
   { href: "/settings", label: "Impostazioni", icon: Settings },
 ];
 
