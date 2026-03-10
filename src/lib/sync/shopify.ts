@@ -106,6 +106,9 @@ export async function syncShopifyOrders(config: ShopifyStoreConfig): Promise<{ s
             created_at: order.created_at,
             updated_at: order.updated_at,
             line_items: order.line_items,
+            discount_codes: order.discount_codes?.length
+              ? order.discount_codes.map((d: { code: string }) => d.code).join(", ")
+              : null,
             shipping_country: order.shipping_address?.country || null,
             shipping_country_code: order.shipping_address?.country_code || null,
             shipping_city: order.shipping_address?.city || null,
