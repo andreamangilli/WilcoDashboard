@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { runAllSyncs } from "@/lib/sync/orchestrator";
 
 export const maxDuration = 300;
 
@@ -13,20 +14,10 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Internally call the cron sync endpoint
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
-
-  const res = await fetch(`${baseUrl}/api/cron/sync`, {
-    method: "GET",
-    headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
-  });
-
-  const data = await res.json();
+  const results = await runAllSyncs();
 
   // Invalidate dashboard cache so pages show fresh data immediately
   revalidateTag("dashboard-data", "max");
 
-  return NextResponse.json(data);
+  return NextResponse.json({ success: true, results });
 }
