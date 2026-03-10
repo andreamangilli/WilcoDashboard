@@ -8,6 +8,7 @@ import {
   Package,
   Megaphone,
   Mail,
+  Zap,
   Settings,
   ClipboardList,
   BarChart2,
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/amazon", label: "Amazon", icon: Package },
   { href: "/ads", label: "Advertising", icon: Megaphone },
   { href: "/klaviyo", label: "Klaviyo", icon: Mail },
+  { href: "/optimonk", label: "OptiMonk", icon: Zap },
   { href: "/settings", label: "Impostazioni", icon: Settings },
 ];
 

@@ -15,6 +15,7 @@ import {
 import { syncGoogleAds, GoogleAdsCredentials } from "./google-ads";
 import { syncMetaAds, MetaAdsCredentials } from "./meta-ads";
 import { syncKlaviyo } from "./klaviyo";
+import { syncOptimonk } from "./optimonk";
 
 export async function runAllSyncs() {
   const results: Record<string, unknown> = {};
@@ -177,6 +178,22 @@ export async function runAllSyncs() {
     }
   } else {
     results.klaviyo = { skipped: "No KLAVIYO_API_KEY configured" };
+  }
+
+  // --- OptiMonk ---
+  if (process.env.OPTIMONK_API_KEY) {
+    const logId = await logSyncStart("optimonk");
+    try {
+      const synced = await syncOptimonk();
+      await logSyncSuccess(logId, synced);
+      results.optimonk = { success: true, results: { synced } };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      await logSyncError(logId, message);
+      results.optimonk = { error: message };
+    }
+  } else {
+    results.optimonk = { skipped: "No OPTIMONK_API_KEY configured" };
   }
 
   return results;
