@@ -9,6 +9,7 @@ import {
   Megaphone,
   Mail,
   Zap,
+  MessageCircle,
   Settings,
   ClipboardList,
   BarChart2,
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/ads", label: "Advertising", icon: Megaphone },
   { href: "/klaviyo", label: "Klaviyo", icon: Mail },
   { href: "/optimonk", label: "OptiMonk", icon: Zap },
+  { href: "/textyess", label: "TextYess", icon: MessageCircle },
   { href: "/settings", label: "Impostazioni", icon: Settings },
 ];
 

@@ -16,6 +16,7 @@ import { syncGoogleAds, GoogleAdsCredentials } from "./google-ads";
 import { syncMetaAds, MetaAdsCredentials } from "./meta-ads";
 import { syncKlaviyo } from "./klaviyo";
 import { syncOptimonk } from "./optimonk";
+import { syncTextyess } from "./textyess";
 
 export async function runAllSyncs() {
   const results: Record<string, unknown> = {};
@@ -194,6 +195,22 @@ export async function runAllSyncs() {
     }
   } else {
     results.optimonk = { skipped: "No OPTIMONK_API_KEY configured" };
+  }
+
+  // --- TextYess ---
+  if (process.env.TEXTYESS_TOKEN) {
+    const logId = await logSyncStart("textyess");
+    try {
+      const synced = await syncTextyess();
+      await logSyncSuccess(logId, synced);
+      results.textyess = { success: true, results: { synced } };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      await logSyncError(logId, message);
+      results.textyess = { error: message };
+    }
+  } else {
+    results.textyess = { skipped: "No TEXTYESS_TOKEN configured" };
   }
 
   return results;
