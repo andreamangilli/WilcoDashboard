@@ -13,6 +13,8 @@ import {
   Settings,
   ClipboardList,
   BarChart2,
+  ExternalLink,
+  Warehouse,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +76,19 @@ export function Sidebar() {
         })}
       </nav>
 
+      {/* External links */}
+      <div className="border-t border-white/[0.06] py-3 px-2.5">
+        <a
+          href="https://packstation.thecove.it/dashboard"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:bg-white/[0.05] hover:text-gray-200 transition-all"
+        >
+          <Warehouse className="h-4 w-4 shrink-0" />
+          Pack Station
+          <ExternalLink className="ml-auto h-3 w-3 shrink-0 opacity-50" />
+        </a>
+      </div>
     </aside>
   );
 }
