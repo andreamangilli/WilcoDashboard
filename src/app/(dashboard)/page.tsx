@@ -12,6 +12,7 @@ import {
 } from "@/lib/queries/overview";
 import { getAdsOverview } from "@/lib/queries/ads";
 import { getSmartInsights } from "@/lib/queries/insights";
+import { getShippingByRegion } from "@/lib/queries/geographic";
 import {
   getCampaignMatrix,
   getParetoAnalysis,
@@ -23,6 +24,7 @@ import { RevenueChart } from "./revenue-chart";
 import { DailyTrendChart } from "./daily-trend-chart";
 import { AdsPlatformComparison } from "./ads-platform-comparison";
 import { InsightsPanel } from "./insights-panel";
+import { ItalyHeatmap } from "./italy-heatmap";
 import { CampaignMatrix } from "./campaign-matrix";
 import { ParetoChart } from "./pareto-chart";
 import { CustomerHealthPanel } from "./customer-health-panel";
@@ -37,7 +39,7 @@ interface Props {
 export default async function DashboardPage({ searchParams }: Props) {
   const { period = "30d", from, to } = await searchParams;
 
-  const [kpis, channels, adsOverview, topProducts, kpisDaily, trend, insights, campaignMatrix, pareto, customerHealth, strategicRecs] =
+  const [kpis, channels, adsOverview, topProducts, kpisDaily, trend, insights, campaignMatrix, pareto, customerHealth, strategicRecs, shippingByRegion] =
     await Promise.all([
       getOverviewKpis(period, from, to),
       getRevenueByChannel(period, from, to),
@@ -50,6 +52,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       getParetoAnalysis(period, from, to),
       getCustomerHealth(period, from, to),
       getStrategicRecommendations(period, from, to),
+      getShippingByRegion(period, from, to),
     ]);
 
   const totalOrders = kpis.orders.value;
@@ -194,6 +197,18 @@ export default async function DashboardPage({ searchParams }: Props) {
           </CardHeader>
           <CardContent>
             <AdsPlatformComparison google={adsOverview.google} meta={adsOverview.meta} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Italy Heatmap */}
+      <div className="mt-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Spedizioni per Regione</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ItalyHeatmap data={shippingByRegion} />
           </CardContent>
         </Card>
       </div>
