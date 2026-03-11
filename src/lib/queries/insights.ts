@@ -1,6 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { fetchAll } from '@/lib/supabase/fetch-all';
+import { getDateRange } from './utils';
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ export function calculateInsights(input: InsightInput): Insight[] {
     insights.push({
       type: 'roas_alert',
       severity: 'medium',
-      message: `${input.lowRoasCampaignCount} campagne con ROAS < 2.0 negli ultimi 7 giorni`,
+      message: `${input.lowRoasCampaignCount} campagne con ROAS < 2.0 nel periodo selezionato`,
     });
   }
 
@@ -158,22 +159,12 @@ export function calculateInsights(input: InsightInput): Insight[] {
 // ── Cached query ───────────────────────────────────────────────
 
 export const getSmartInsights = unstable_cache(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- params used as unstable_cache keys
-  async (_period: string, _from?: string, _to?: string): Promise<Insight[]> => {
+  async (period: string, from?: string, to?: string): Promise<Insight[]> => {
     const supabase = await createServiceClient();
+    const { start, end, prevStart, prevEnd } = getDateRange(period, from, to);
 
-    const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const fourteenDaysAgo = new Date(now);
-    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-
-    const curr7Start = sevenDaysAgo.toISOString();
-    const curr7End = now.toISOString();
-    const prev7Start = fourteenDaysAgo.toISOString();
-    const prev7End = sevenDaysAgo.toISOString();
-    const curr7DateStart = curr7Start.split('T')[0];
-    const curr7DateEnd = curr7End.split('T')[0];
+    const currDateStart = start.split('T')[0];
+    const currDateEnd = end.split('T')[0];
 
     const { data: stores } = await supabase.from('stores').select('id, name');
 
@@ -183,12 +174,12 @@ export const getSmartInsights = unstable_cache(
           fetchAll<{ total: number }>(({ from: f, to: t }) =>
             supabase.from('shopify_orders').select('total')
               .eq('store_id', store.id).eq('financial_status', 'paid')
-              .gte('created_at', curr7Start).lte('created_at', curr7End).range(f, t)
+              .gte('created_at', start).lte('created_at', end).range(f, t)
           ),
           fetchAll<{ total: number }>(({ from: f, to: t }) =>
             supabase.from('shopify_orders').select('total')
               .eq('store_id', store.id).eq('financial_status', 'paid')
-              .gte('created_at', prev7Start).lte('created_at', prev7End).range(f, t)
+              .gte('created_at', prevStart).lte('created_at', prevEnd).range(f, t)
           ),
         ]);
         return {
@@ -202,11 +193,11 @@ export const getSmartInsights = unstable_cache(
     const [amazonCurr, amazonPrev] = await Promise.all([
       fetchAll<{ item_price: number }>(({ from: f, to: t }) =>
         supabase.from('amazon_orders').select('item_price')
-          .gte('purchase_date', curr7Start).lte('purchase_date', curr7End).range(f, t)
+          .gte('purchase_date', start).lte('purchase_date', end).range(f, t)
       ),
       fetchAll<{ item_price: number }>(({ from: f, to: t }) =>
         supabase.from('amazon_orders').select('item_price')
-          .gte('purchase_date', prev7Start).lte('purchase_date', prev7End).range(f, t)
+          .gte('purchase_date', prevStart).lte('purchase_date', prevEnd).range(f, t)
       ),
     ]);
 
@@ -219,9 +210,9 @@ export const getSmartInsights = unstable_cache(
 
     const [{ data: googleSpend }, { data: metaSpend }] = await Promise.all([
       supabase.from('ad_spend_daily').select('spend, revenue, impressions, clicks')
-        .in('ad_account_id', googleIds).gte('date', curr7DateStart).lte('date', curr7DateEnd),
+        .in('ad_account_id', googleIds).gte('date', currDateStart).lte('date', currDateEnd),
       supabase.from('ad_spend_daily').select('spend, revenue, impressions, clicks')
-        .in('ad_account_id', metaIds).gte('date', curr7DateStart).lte('date', curr7DateEnd),
+        .in('ad_account_id', metaIds).gte('date', currDateStart).lte('date', currDateEnd),
     ]);
 
     function sumAds(rows: typeof googleSpend) {
@@ -239,8 +230,8 @@ export const getSmartInsights = unstable_cache(
     const { data: dailyAds } = await supabase
       .from('ad_spend_daily')
       .select('date, spend, revenue')
-      .gte('date', curr7DateStart)
-      .lte('date', curr7DateEnd)
+      .gte('date', currDateStart)
+      .lte('date', currDateEnd)
       .order('date');
 
     const roasByDate: Record<string, { spend: number; revenue: number }> = {};
@@ -264,7 +255,7 @@ export const getSmartInsights = unstable_cache(
     const { data: recentCampaignSpend } = await supabase
       .from('ad_spend_daily')
       .select('campaign_id, spend, revenue')
-      .gte('date', curr7DateStart);
+      .gte('date', currDateStart);
 
     const campaignSpend = new Map<string, { spend: number; revenue: number }>();
     for (const r of recentCampaignSpend || []) {
